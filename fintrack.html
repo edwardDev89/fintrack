@@ -252,6 +252,24 @@
   .row.done .row-value { color: var(--muted); }
   .cat-list .row { padding: 8px 2px; }
   .cat-list .row-actions { opacity: 1; }
+  .link-row { cursor: pointer; border-radius: 10px; transition: background-color .15s; }
+  .link-row:hover { background: var(--surface-2); }
+  .link-row .icon-btn { color: var(--muted); }
+  .quick-add { display: grid; grid-template-columns: minmax(0, 1fr) 170px auto; gap: 8px; }
+  .quick-add .btn { height: 40px; }
+  @media (max-width: 560px) { .quick-add { grid-template-columns: minmax(0, 1fr) auto; } .quick-add #dailyLabel { grid-column: 1 / -1; } }
+  .quick-note { margin: 8px 0 18px; font-size: 12.5px; color: var(--muted); }
+  .pos-accent { color: var(--accent); font-weight: 560; }
+  .date-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .date-bar .lbl { font-size: 12.5px; color: var(--muted); margin-right: 2px; }
+  .date-chip { height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-2); font-size: 13px; font-weight: 560; cursor: pointer; transition: background-color .15s, color .15s; }
+  .date-chip:hover { background: var(--surface-2); }
+  .date-chip[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+  .date-bar input[type="date"] { width: auto; display: inline-block; height: 32px; line-height: 30px; padding: 0 12px; border-radius: 999px; color: var(--text-2); }
+  .date-bar input[type="date"].on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .day-group + .day-group { margin-top: 16px; }
+  .day-head { display: flex; justify-content: space-between; gap: 12px; padding: 6px 4px; font-size: 12.5px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  .day-group .row:first-child { border-top: 0; }
 
   /* Empty / hero */
   .hero { min-height: calc(100vh - 170px); display: grid; place-items: center; text-align: center; padding: 48px 0; }
@@ -445,10 +463,13 @@ const SERIES = [
   { key: 'debt', name: 'Debt', color: '--c3' }
 ];
 const PALETTE = ['#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#f43f5e', '#8b5cf6', '#22c55e', '#ec4899', '#64748b', '#eab308', '#06b6d4', '#a3a3a3'];
-const TABS = [['portfolio', 'Portfolio'], ['expenses', 'Expenses'], ['wishlist', 'Goals']];
+const TABS = [['portfolio', 'Portfolio'], ['expenses', 'Expenses'], ['daily', 'Daily'], ['wishlist', 'Goals']];
+const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const GOAL_KINDS = { do: 'Year goal', buy: 'Spend goal' };
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const NEW_OPTION = '__new__';
+const DAILY_LABEL = 'Daily expense';
+const MISC_LABEL = 'Miscellaneous';
 
 const ico = (d) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const I = {
@@ -481,6 +502,7 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const pad2 = (n) => String(n).padStart(2, '0');
 const currentKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; };
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
 const shiftMonth = (key, delta) => { const [y, m] = key.split('-').map(Number); const d = new Date(y, m - 1 + delta, 1); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; };
 const monthDiff = (a, b) => { const [ay, am] = a.split('-').map(Number), [by, bm] = b.split('-').map(Number); return (by - ay) * 12 + (bm - am); };
 
@@ -492,6 +514,7 @@ function defaultState() {
     categories: DEFAULT_CATEGORIES.map((name) => ({ id: uid(), name })),
     portfolioGoal: 0,
     installments: [],
+    daily: [],
     wishlist: {},
     months: {}
   };
@@ -515,6 +538,8 @@ function normalize(d) {
   out.settings.name = str(s.name).trim().slice(0, 40);
   if (Array.isArray(d.categories)) out.categories = objs(d.categories).map((c) => ({ id: id(c.id), name: str(c.name, 'Unnamed') }));
   out.portfolioGoal = num(d.portfolioGoal);
+  out.daily = objs(d.daily).filter((e) => DATE_RE.test(e.date))
+    .map((e) => ({ id: id(e.id), date: e.date, label: str(e.label, DAILY_LABEL) || DAILY_LABEL, amount: num(e.amount) }));
   out.installments = objs(d.installments)
     .filter((p) => MONTH_RE.test(p.start))
     .map((p) => ({
@@ -606,6 +631,7 @@ function instAt(p, k) {
   };
 }
 const activeInstallments = (k) => state.installments.map((p) => ({ p, s: instAt(p, k) })).filter((x) => x.s.active);
+const dailyIn = (k) => state.daily.filter((e) => e.date.startsWith(k + '-'));
 
 function totals(k) {
   const m = state.months[k];
@@ -616,9 +642,11 @@ function totals(k) {
   const expenses = sum(m.expenses, 'amount');
   const instPay = activeInstallments(k).reduce((s, x) => s + x.p.monthly, 0);
   const payments = sum(m.debts, 'monthlyPayment');
-  const spent = expenses + instPay + payments;
+  const dailyList = dailyIn(k);
+  const daily = Math.round(sum(dailyList, 'amount') * 100) / 100;
+  const spent = expenses + daily + instPay + payments;
   return {
-    portfolio, debt, instOwed, expenses, instPay, payments, spent,
+    portfolio, debt, instOwed, expenses, daily, dailyCount: dailyList.length, instPay, payments, spent,
     netWorth: portfolio - debt,
     income: m.income,
     left: m.income - spent
@@ -806,7 +834,7 @@ function insights(keys) {
   const p = i > 0 ? totals(keys[i - 1]) : null;
   const when = ui.month === currentKey() ? 'this month' : `in ${monthLabel(ui.month, { month: 'short' })}`;
   const out = [];
-  if (!m.assets.length && !m.expenses.length && !m.income && !m.debts.length) {
+  if (!m.assets.length && !m.expenses.length && !m.income && !m.debts.length && !dailyIn(ui.month).length) {
     return ['Add your income, assets and expenses below to see your summary here.'];
   }
   activeInstallments(ui.month).filter(({ p: plan, s }) => s.n === plan.months)
@@ -903,6 +931,7 @@ function renderDonuts() {
   const add = (k, v) => { spend[k] = (spend[k] || 0) + v; };
   m.expenses.forEach((e) => add(catName(e.categoryId), e.amount));
   activeInstallments(ui.month).forEach(({ p }) => add(catName(p.categoryId), p.monthly));
+  if (t.daily > 0) add(MISC_LABEL, t.daily);
   if (t.payments > 0) add('Debt repayments', t.payments);
   const items = (o) => Object.entries(o).map(([label, value]) => ({ label, value }));
   donut($('#assetDonut'), items(assets), 'Portfolio', 'Add assets in the Portfolio tab to see your allocation');
@@ -912,6 +941,56 @@ function renderDonuts() {
 function renderTabs() {
   $('#tabs').innerHTML = TABS.map(([k, l]) => `<button class="tab${ui.tab === k ? ' active' : ''}" role="tab" aria-selected="${ui.tab === k}" data-action="tab" data-tab="${k}">${l}</button>`).join('');
   $('#tabPanel').innerHTML = PANELS[ui.tab]();
+  if (ui.focusDaily && $('#dailyLabel')) { $('#dailyLabel').focus({ preventScroll: true }); ui.focusDaily = false; }
+}
+
+// Date helpers for the Daily tab.
+const yesterdayKey = () => { const d = new Date(); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const fmtDay = (d, opts = { weekday: 'short', day: 'numeric', month: 'short' }) => {
+  const [y, mo, da] = d.split('-').map(Number);
+  return new Intl.DateTimeFormat('en-GB', opts).format(new Date(y, mo - 1, da));
+};
+const dayLabel = (d) => d === todayKey() ? 'Today' : d === yesterdayKey() ? 'Yesterday' : fmtDay(d);
+// The date new daily entries go to: today unless you picked an earlier day (kept until you switch back).
+const dailyDate = () => (ui.dailyDate && ui.dailyDate < todayKey() ? ui.dailyDate : todayKey());
+function dailyNote(d) {
+  const today = todayKey();
+  const full = fmtDay(d, { weekday: 'short', day: 'numeric', month: 'short', year: d.slice(0, 4) === today.slice(0, 4) ? undefined : 'numeric' });
+  return d === today
+    ? `Adds to today, ${esc(full)}`
+    : `<span class="pos-accent">Adding to ${esc(dayLabel(d) === 'Yesterday' ? `yesterday, ${full}` : full)}</span> · <button type="button" class="link" data-action="daily-date" data-date="${today}">back to today</button>`;
+}
+function setDailyDate(d) {
+  const today = todayKey(), yest = yesterdayKey();
+  if (!DATE_RE.test(d) || d > today) d = today;
+  ui.dailyDate = d === today ? null : d;
+  const bar = $('#dailyDateBar');
+  if (!bar) return;
+  $$('.date-chip', bar).forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.date === d)));
+  const inp = $('#dailyDate');
+  inp.value = d;
+  inp.classList.toggle('on', d !== today && d !== yest);
+  $('#dailyNote').innerHTML = dailyNote(d);
+}
+
+// Quick-add for the Daily tab (today by default). Creates the entry's month (copying the latest earlier one) if needed.
+function addDaily(form) {
+  const label = $('#dailyLabel', form).value.trim().slice(0, 80);
+  const raw = $('#dailyAmount', form).value.trim();
+  const amount = Math.round(Number(raw) * 100) / 100;
+  if (!raw || !Number.isFinite(amount) || amount <= 0) { toast('Enter an amount first', 'error'); $('#dailyAmount', form).focus(); return; }
+  const date = dailyDate(), k = date.slice(0, 7);
+  state.daily.push({ id: uid(), date, label: label || DAILY_LABEL, amount });
+  let msg = `${label || DAILY_LABEL} · ${money(amount)} added${date === todayKey() ? '' : ` to ${dayLabel(date).toLowerCase() === 'yesterday' ? 'yesterday' : fmtDay(date)}`}`;
+  if (!state.months[k]) {
+    const prev = monthKeys().filter((x) => x < k).pop();
+    state.months[k] = prev ? clone(state.months[prev]) : emptyMonth();
+    msg = `Started ${monthLabel(k, { month: 'long', year: 'numeric' })}${prev ? ` (copied from ${monthLabel(prev, { month: 'short' })})` : ''} · ${msg}`;
+  }
+  if (ui.month !== k) ui.month = k;
+  ui.focusDaily = true;
+  persist();
+  toast(msg);
 }
 
 const panelHead = (title, sub, list, addLabel, extra = '') => `
@@ -959,6 +1038,7 @@ const PANELS = {
     const m = cur(), t = totals(ui.month);
     const r = t.income > 0 ? t.spent / t.income : 0;
     const parts = [`expenses ${esc(money(t.expenses))}`];
+    if (t.daily > 0) parts.push(`daily ${esc(money(t.daily))}`);
     if (t.instPay > 0) parts.push(`installments ${esc(money(t.instPay))}`);
     if (t.payments > 0) parts.push(`debt repayments ${esc(money(t.payments))}`);
     const box = `<div class="summary-box">
@@ -976,9 +1056,18 @@ const PANELS = {
       `<span class="badge">${esc(catName(p.categoryId))}</span><span class="badge" style="background:var(--accent-soft);color:var(--accent)">Installment ${s.n}/${p.months}</span>` +
       `<span>${s.n === p.months ? 'Final payment' : `${esc(money(s.owed))} left · ends ${esc(monthLabel(s.end))}`}</span>`,
       esc(money(p.monthly))) }));
+    if (t.dailyCount) {
+      rows.push({ cat: MISC_LABEL, amount: t.daily, html: `
+        <li class="row link-row" data-action="tab" data-tab="daily" title="Open daily expenses">
+          <div class="row-main"><div class="row-title">${MISC_LABEL}</div>
+            <div class="row-sub"><span class="badge" style="background:var(--accent-soft);color:var(--accent)">Daily spending</span><span>${t.dailyCount} entr${t.dailyCount === 1 ? 'y' : 'ies'} · tap to view</span></div></div>
+          <div class="row-value">${esc(money(t.daily))}</div>
+          <span class="icon-btn sm" aria-hidden="true">${I.right}</span>
+        </li>` });
+    }
     rows.sort((a, b) => a.cat.localeCompare(b.cat) || b.amount - a.amount);
     const extra = `<button class="btn btn-ghost" data-action="manage-categories">Categories</button>`;
-    const expenses = `<div class="section">${panelHead('Expenses', `${rows.length} item${rows.length === 1 ? '' : 's'} · ${esc(money(t.expenses + t.instPay))}`, 'expenses', 'Add expense', extra)}
+    const expenses = `<div class="section">${panelHead('Expenses', `${rows.length} item${rows.length === 1 ? '' : 's'} · ${esc(money(t.expenses + t.daily + t.instPay))}`, 'expenses', 'Add expense', extra)}
       ${rows.length ? `<ul class="list">${rows.map((x) => x.html).join('')}</ul>` : emptyList('No expenses for this month yet. Paying by installment? Choose <b>Installment</b> in <b>Add expense</b> and it will repeat every month for you.')}</div>`;
 
     const debts = m.debts.slice().sort((a, b) => b.balance - a.balance);
@@ -989,6 +1078,52 @@ const PANELS = {
         `<span class="badge">${esc(d.type)}</span>${d.monthlyPayment > 0 ? `<span>${esc(money(d.monthlyPayment))}/mo${d.balance > 0 ? ` · ~${Math.ceil(d.balance / d.monthlyPayment)} months left` : ''}</span>` : ''}`,
         esc(money(d.balance)))).join('')}</ul>` : emptyList('No debts. Nice! Add loans or credit card balances here. Monthly repayments count as spending.')}</div>`;
     return box + expenses + debtHtml;
+  },
+  daily() {
+    const t = totals(ui.month);
+    const today = todayKey(), yest = yesterdayKey();
+    const isCurrent = ui.month === currentKey();
+    const dayName = dayLabel;
+
+    // Newest day first; within a day, most recently added first.
+    const entries = dailyIn(ui.month).slice().reverse().sort((a, b) => b.date.localeCompare(a.date));
+    const groups = [];
+    entries.forEach((e) => {
+      const g = groups[groups.length - 1];
+      if (g && g.date === e.date) g.items.push(e); else groups.push({ date: e.date, items: [e] });
+    });
+    const todayTotal = sum(dailyIn(ui.month).filter((e) => e.date === today), 'amount');
+    const [y, mo] = ui.month.split('-').map(Number);
+    const lastDay = isCurrent ? new Date().getDate() : new Date(y, mo, 0).getDate();
+    // Average from the first day you logged something, so starting mid-month doesn't drag it down.
+    const firstDay = entries.length ? Math.min(...entries.map((e) => Number(e.date.slice(8)))) : lastDay;
+    const daysSoFar = Math.max(1, lastDay - firstDay + 1);
+    const box = `<div class="summary-box">
+      <div><div class="lbl">${isCurrent ? 'This month' : monthLabel(ui.month, { month: 'long' })}</div><strong>${esc(money(t.daily))}</strong></div>
+      <div><div class="lbl">${isCurrent ? 'Today' : 'Days logged'}</div><strong>${isCurrent ? esc(money(todayTotal)) : groups.length}</strong></div>
+      <div><div class="lbl">Daily average</div><strong>${esc(money(Math.round((t.daily / daysSoFar) * 100) / 100))}</strong></div>
+      <div class="note">Counts as <b>${MISC_LABEL}</b> in your Expenses.</div>
+    </div>`;
+    const sel = dailyDate();
+    const quick = `<div class="date-bar" id="dailyDateBar">
+        <span class="lbl">Date</span>
+        <button type="button" class="date-chip" data-action="daily-date" data-date="${today}" aria-pressed="${sel === today}">Today</button>
+        <button type="button" class="date-chip" data-action="daily-date" data-date="${yest}" aria-pressed="${sel === yest}">Yesterday</button>
+        <input type="date" id="dailyDate" class="${sel !== today && sel !== yest ? 'on' : ''}" value="${sel}" max="${today}" aria-label="Pick an earlier date">
+      </div>
+      <form class="quick-add" id="dailyForm" autocomplete="off" novalidate>
+        <input type="text" id="dailyLabel" placeholder="What was it? e.g. Lunch, Grab, Coffee" maxlength="80" aria-label="Description">
+        <div class="money-input"><span>${esc(currencySymbol())}</span><input type="number" id="dailyAmount" inputmode="decimal" step="0.01" min="0" placeholder="0.00" aria-label="Amount"></div>
+        <button type="submit" class="btn btn-primary">${I.plus}Add</button>
+      </form>
+      <p class="quick-note" id="dailyNote">${dailyNote(sel)}</p>`;
+    const list = groups.length ? groups.map((g) => `
+      <div class="day-group">
+        <div class="day-head"><span>${esc(dayName(g.date))}</span><span>${esc(money(sum(g.items, 'amount')))}</span></div>
+        <ul class="list">${g.items.map((e) => row('daily', e.id, e.label, '', esc(money(e.amount)))).join('')}</ul>
+      </div>`).join('')
+      : emptyList(`No daily spending logged for ${esc(monthLabel(ui.month, { month: 'long' }))} yet. Coffee, lunch, parking: add them above as they happen.`);
+    return panelHead('Daily expenses', 'Small everyday spending, kept out of your main expenses list') + box + quick + list;
   },
   wishlist() {
     const y = wishYear();
@@ -1175,6 +1310,10 @@ const SCHEMAS = {
     { name: 'name', label: 'Goal', required: true, placeholder: 'e.g. Run a half marathon, read 12 books' },
     { name: 'cost', label: 'Estimated cost', type: 'number', when: 'buy' },
     { name: 'done', label: 'Done', type: 'checkbox', value: false }] },
+  daily: { noun: 'daily expense', fields: () => [
+    { name: 'label', label: 'Description', required: true, placeholder: 'e.g. Lunch, Grab, Coffee' },
+    { name: 'amount', label: 'Amount', type: 'number', required: true },
+    { name: 'date', label: 'Date', type: 'date', required: true, value: todayKey(), hint: 'Forgot to log something? Change the date here.' }] },
   categories: { noun: 'category', fields: () => [
     { name: 'name', label: 'Category name', required: true, placeholder: 'e.g. Groceries' }] }
 };
@@ -1182,6 +1321,7 @@ const SCHEMAS = {
 function getList(list) {
   if (list === 'categories') return state.categories;
   if (list === 'installments') return state.installments;
+  if (list === 'daily') return state.daily;
   if (list === 'wishlist') { const y = wishYear(); return state.wishlist[y] || (state.wishlist[y] = []); }
   return cur()[list];
 }
@@ -1201,9 +1341,11 @@ function editItem(list, id, after) {
     onSubmit(v) {
       if (list === 'categories' && state.categories.some((c) => c !== item && c.name.toLowerCase() === v.name.toLowerCase())) return 'A category with that name already exists.';
       if (list === 'installments' && !MONTH_RE.test(v.start)) return 'Please enter the first payment month as YYYY-MM.';
+      if (list === 'daily' && !DATE_RE.test(v.date)) return 'Please pick a valid date.';
       if (list === 'wishlist' && v.kind !== 'buy') v.cost = 0;
       if (item) Object.assign(item, v); else arr.push({ id: uid(), ...v });
-      const msg = item ? `${cap} updated` : `${cap} added`;
+      let msg = item ? `${cap} updated` : `${cap} added`;
+      if (list === 'daily' && !v.date.startsWith(ui.month + '-')) msg += ` · moved to ${monthLabel(v.date.slice(0, 7))}`;
       toast(list === 'installments' ? instToast(v, msg) : msg);
     }
   });
@@ -1356,8 +1498,13 @@ function deleteMonth() {
   if (!ui.month) return;
   confirmDialog({
     title: 'Delete this month?',
-    message: `All entries for <b>${esc(monthLabel(ui.month, { month: 'long', year: 'numeric' }))}</b> will be permanently removed. Installment plans are kept.`,
-    onConfirm() { delete state.months[ui.month]; ui.month = null; persist(); toast('Month deleted'); }
+    message: `All entries for <b>${esc(monthLabel(ui.month, { month: 'long', year: 'numeric' }))}</b>, including its daily expenses, will be permanently removed. Installment plans are kept.`,
+    onConfirm() {
+      const k = ui.month;
+      delete state.months[k];
+      state.daily = state.daily.filter((e) => !e.date.startsWith(k + '-'));
+      ui.month = null; persist(); toast('Month deleted');
+    }
   });
 }
 
@@ -1389,11 +1536,23 @@ function demoState() {
       expenses: [
         ['Housing', 'Rent', 1500], ['Food & Dining', 'Groceries & meals', 700 + w * 120], ['Transport', 'Fuel, tolls & parking', 360 + v * 50],
         ['Utilities', 'Electricity, water, internet', 230 + w * 20], ['Shopping', 'Online shopping', 260 + Math.sin(t * 2.7) * 120],
-        ['Entertainment', 'Streaming & outings', 170 + v * 60], ['Health', 'Gym & pharmacy', 120 + w * 20], ['Other', 'Miscellaneous', 150 + Math.cos(t * 1.9) * 70]
+        ['Entertainment', 'Streaming & outings', 170 + v * 60], ['Health', 'Gym & pharmacy', 120 + w * 20], ['Other', 'Haircut & personal care', 150 + Math.cos(t * 1.9) * 70]
       ].map(([c, l, a]) => ({ id: uid(), categoryId: cat(c), label: l, amount: r(a) }))
     };
   }
   s.portfolioGoal = 200000;
+  // A few small purchases per day for the last two months, up to today.
+  const picks = [['Coffee', 9], ['Lunch', 15], ['Grab ride', 18], ['Parking', 4], ['Breakfast', 8], ['Snacks', 6], ['Bubble tea', 12], ['Dinner', 22]];
+  const now = new Date();
+  for (let back = 45; back >= 0; back--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
+    const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const count = 1 + (back % 3);
+    for (let j = 0; j < count; j++) {
+      const [label, base] = picks[(back * 3 + j * 5) % picks.length];
+      s.daily.push({ id: uid(), date, label, amount: Math.round((base + Math.sin(back + j) * base * 0.3) * 100) / 100 });
+    }
+  }
   s.installments = [
     { id: uid(), name: 'iPhone 16 Pro (credit card 0%)', categoryId: cat('Shopping'), monthly: 350, months: 12, start: shiftMonth(end, -3) },
     { id: uid(), name: 'Sofa (6-month EPP)', categoryId: cat('Housing'), monthly: 200, months: 6, start: shiftMonth(end, -7) }
@@ -1502,6 +1661,7 @@ document.addEventListener('click', (e) => {
     case 'import': $('#importFile').click(); break;
     case 'reset': resetAll(); break;
     case 'jump-edit': jumpToEditor(); break;
+    case 'daily-date': setDailyDate(b.dataset.date); break;
     case 'tab':
       ui.tab = b.dataset.tab; renderTabs();
       if (!b.closest('#tabs')) jumpToEditor();
@@ -1524,6 +1684,8 @@ document.addEventListener('click', (e) => {
 });
 
 $('#monthSelect').addEventListener('change', (e) => { ui.month = e.target.value; render(); });
+document.addEventListener('submit', (e) => { if (e.target.id === 'dailyForm') { e.preventDefault(); addDaily(e.target); } });
+document.addEventListener('change', (e) => { if (e.target.id === 'dailyDate') setDailyDate(e.target.value); });
 $('#currencySelect').addEventListener('change', (e) => { state.settings.currency = e.target.value; fmtCache = {}; persist(); toast(`Currency set to ${e.target.value}`); });
 $('#importFile').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) importData(f); e.target.value = ''; });
 $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') closeModal(); });
