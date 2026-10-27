@@ -266,12 +266,23 @@
   .modal-head h3 { font-size: 17px; font-weight: 640; }
   .modal p.msg { margin: 0 0 20px; color: var(--text-2); }
   .field { display: grid; gap: 6px; margin-bottom: 14px; }
+  .field > * { min-width: 0; }
   .field > span { font-size: 12.5px; font-weight: 560; color: var(--text-2); }
   .field small { color: var(--muted); font-weight: 400; }
   input, select {
     font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
     height: 40px; padding: 0 12px; width: 100%; outline: none; transition: border-color .15s, box-shadow .15s;
   }
+  /* iOS Safari gives month/date inputs a wider native size; make them match the other fields. */
+  input[type="month"], input[type="date"] { -webkit-appearance: none; appearance: none; display: block; min-width: 0; max-width: 100%; line-height: 38px; text-align: left; }
+  input::-webkit-date-and-time-value { text-align: left; margin: 0; }
+  .segment { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 999px; }
+  .segment label { position: relative; cursor: pointer; }
+  .segment input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .segment span { display: block; text-align: center; padding: 7px 10px; border-radius: 999px; font-weight: 560; color: var(--muted); transition: background-color .15s, color .15s; }
+  .segment input:checked + span { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+  .segment input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .form-note { margin: -4px 0 14px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--text-2); font-size: 12.5px; }
   select {
     appearance: none; -webkit-appearance: none; padding-right: 34px; cursor: pointer;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a90a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -429,7 +440,8 @@ const SERIES = [
   { key: 'debt', name: 'Debt', color: '--c3' }
 ];
 const PALETTE = ['#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#f43f5e', '#8b5cf6', '#22c55e', '#ec4899', '#64748b', '#eab308', '#06b6d4', '#a3a3a3'];
-const TABS = [['portfolio', 'Portfolio'], ['expenses', 'Expenses'], ['wishlist', 'Wishlist']];
+const TABS = [['portfolio', 'Portfolio'], ['expenses', 'Expenses'], ['wishlist', 'Goals']];
+const GOAL_KINDS = { do: 'Year goal', buy: 'Spend goal' };
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const NEW_OPTION = '__new__';
 
@@ -505,7 +517,10 @@ function normalize(d) {
   if (d.wishlist && typeof d.wishlist === 'object' && !Array.isArray(d.wishlist)) {
     for (const [y, items] of Object.entries(d.wishlist)) {
       if (!/^\d{4}$/.test(y)) continue;
-      const list = objs(items).map((w) => ({ id: id(w.id), name: str(w.name, 'Wish'), cost: num(w.cost), done: w.done === true }));
+      const list = objs(items).map((w) => ({
+        id: id(w.id), name: str(w.name, 'Goal'), cost: num(w.cost), done: w.done === true,
+        kind: w.kind === 'buy' || w.kind === 'do' ? w.kind : (num(w.cost) > 0 ? 'buy' : 'do')
+      }));
       if (list.length) out.wishlist[y] = list;
     }
   }
@@ -915,10 +930,9 @@ const PANELS = {
       `<span>${s.n === p.months ? 'Final payment' : `${esc(money(s.owed))} left · ends ${esc(monthLabel(s.end))}`}</span>`,
       esc(money(p.monthly))) }));
     rows.sort((a, b) => a.cat.localeCompare(b.cat) || b.amount - a.amount);
-    const extra = `<button class="btn btn-ghost" data-action="manage-categories">Categories</button>
-      <button class="btn btn-ghost" data-action="add" data-list="installments">${I.plus}Installment</button>`;
+    const extra = `<button class="btn btn-ghost" data-action="manage-categories">Categories</button>`;
     const expenses = `<div class="section">${panelHead('Expenses', `${rows.length} item${rows.length === 1 ? '' : 's'} · ${esc(money(t.expenses + t.instPay))}`, 'expenses', 'Add expense', extra)}
-      ${rows.length ? `<ul class="list">${rows.map((x) => x.html).join('')}</ul>` : emptyList('No expenses for this month yet.')}</div>`;
+      ${rows.length ? `<ul class="list">${rows.map((x) => x.html).join('')}</ul>` : emptyList('No expenses for this month yet. Paying by installment? Choose <b>Installment</b> in <b>Add expense</b> and it will repeat every month for you.')}</div>`;
 
     const debts = m.debts.slice().sort((a, b) => b.balance - a.balance);
     const debtSub = `${esc(money(t.debt - t.instOwed))} outstanding · ${esc(money(t.payments))}/mo` +
@@ -931,18 +945,22 @@ const PANELS = {
   },
   wishlist() {
     const y = wishYear();
-    const items = (state.wishlist[y] || []).slice().sort((a, b) => a.done - b.done);
-    const total = sum(items, 'cost'), doneItems = items.filter((w) => w.done);
-    const sub = items.length
-      ? `${doneItems.length} of ${items.length} done · ${esc(money(sum(doneItems, 'cost')))} of ${esc(money(total))}`
-      : 'Things you want to buy or do this year';
-    return panelHead(`Wishlist ${y}`, sub, 'wishlist', 'Add wish') +
-      (items.length ? `${bar(total > 0 ? sum(doneItems, 'cost') / total : doneItems.length / items.length, 'ok')}<ul class="list" style="margin-top:8px">${items.map((w) => row('wishlist', w.id, w.name, '',
-        w.cost > 0 ? esc(money(w.cost)) : '', {
+    const items = (state.wishlist[y] || []).slice().sort((a, b) => a.done - b.done || (a.kind === b.kind ? 0 : a.kind === 'do' ? -1 : 1));
+    const doneItems = items.filter((w) => w.done);
+    const spend = items.filter((w) => w.kind === 'buy' && w.cost > 0);
+    let sub = 'Things you want to do or buy this year';
+    if (items.length) {
+      sub = `${doneItems.length} of ${items.length} done`;
+      if (spend.length) sub += ` · ${esc(money(sum(spend.filter((w) => w.done), 'cost')))} of ${esc(money(sum(spend, 'cost')))} spend goals`;
+    }
+    return panelHead(`${y} goals`, sub, 'wishlist', 'Add goal') +
+      (items.length ? `${bar(doneItems.length / items.length, 'ok')}<ul class="list" style="margin-top:8px">${items.map((w) => row('wishlist', w.id, w.name,
+        `<span class="badge"${w.kind === 'buy' ? ' style="background:var(--accent-soft);color:var(--accent)"' : ''}>${GOAL_KINDS[w.kind]}</span>`,
+        w.kind === 'buy' && w.cost > 0 ? esc(money(w.cost)) : '', {
           cls: w.done ? 'done' : '',
           lead: `<button class="check-btn" data-action="toggle-wish" data-id="${esc(w.id)}" aria-label="${w.done ? 'Mark as not done' : 'Mark as done'}" aria-pressed="${w.done}">${I.check}</button>`
         })).join('')}</ul>`
-        : emptyList(`Nothing on your ${y} wishlist yet. Add a trip, a new laptop, a course…`));
+        : emptyList(`No goals for ${y} yet. Add something to do (run a half marathon, learn to swim) or something to buy (Japan trip, new laptop).`));
   }
 };
 
@@ -953,7 +971,7 @@ function showModal(title, html) {
   $('#modalTitle').textContent = title;
   $('#modalBody').innerHTML = html;
   $('#modal').hidden = false;
-  const first = $('#modalBody input:not([type=checkbox]), #modalBody select, #modalBody .btn-primary, #modalBody .btn-danger');
+  const first = $('#modalBody input:not([type=checkbox]):not([type=radio]), #modalBody select, #modalBody .btn-primary, #modalBody .btn-danger');
   if (first) setTimeout(() => first.focus(), 30);
 }
 function closeModal() {
@@ -964,10 +982,18 @@ function closeModal() {
 
 function openForm({ title, fields, submitLabel = 'Save', onSubmit, after }) {
   const sym = esc(currencySymbol());
+  // A 'segment' field (e.g. One-time / Installment) shows only the fields whose `when` matches its value.
+  const seg = fields.find((f) => f.type === 'segment');
+  const showing = (f) => !f.when || !seg || f.when === seg.value;
   const body = fields.map((f) => {
     const id = `f-${f.name}`;
     const v = f.value == null ? '' : f.value;
     if (f.type === 'checkbox') return `<label class="check"><input type="checkbox" id="${id}" name="${f.name}"${v ? ' checked' : ''}><span>${esc(f.label)}</span></label>`;
+    if (f.type === 'segment') {
+      return `<div class="field"><span>${esc(f.label)}</span><div class="segment" role="radiogroup" aria-label="${esc(f.label)}">${f.options.map((o) =>
+        `<label><input type="radio" name="${f.name}" value="${esc(o.value)}"${o.value === v ? ' checked' : ''}><span>${esc(o.label)}</span></label>`).join('')}</div></div>`;
+    }
+    if (f.type === 'note') return `<p class="form-note"${f.when ? ` data-when="${f.when}"` : ''}${showing(f) ? '' : ' hidden'}>${esc(f.label)}</p>`;
     let input;
     if (f.type === 'select') {
       const opts = f.options.concat(f.allowNew ? [{ value: NEW_OPTION, label: '+ New category…' }] : []);
@@ -984,7 +1010,8 @@ function openForm({ title, fields, submitLabel = 'Save', onSubmit, after }) {
       input = `<input type="${f.type || 'text'}" id="${id}" name="${f.name}" value="${esc(v)}" placeholder="${esc(f.placeholder || '')}" maxlength="80" autocomplete="off">`;
     }
     const hint = f.hint ? `<small>${esc(f.hint)}</small>` : '';
-    return `<label class="field" for="${id}"><span>${esc(f.label)}${f.required ? '' : ' <small>(optional)</small>'}</span>${input}${hint}</label>`;
+    const when = f.when ? ` data-when="${f.when}"${showing(f) ? '' : ' hidden'}` : '';
+    return `<label class="field" for="${id}"${when}><span>${esc(f.label)}${f.required ? '' : ' <small>(optional)</small>'}</span>${input}${hint}</label>`;
   }).join('');
   showModal(title, `<form id="modalForm" novalidate>${body}<p class="form-error" hidden></p>
     <div class="modal-actions"><button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
@@ -995,15 +1022,25 @@ function openForm({ title, fields, submitLabel = 'Save', onSubmit, after }) {
     const sel = form.elements[f.name], extra = form.elements[`${f.name}__new`];
     sel.addEventListener('change', () => { extra.hidden = sel.value !== NEW_OPTION; if (!extra.hidden) extra.focus(); });
   });
+  if (seg) {
+    $$(`input[name="${seg.name}"]`, form).forEach((r) => r.addEventListener('change', () => {
+      $$('[data-when]', form).forEach((w) => { w.hidden = w.dataset.when !== r.value; });
+      $('.form-error', form).hidden = true;
+      if (seg.onChange) seg.onChange(r.value, form);
+    }));
+  }
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const vals = {};
+    if (seg) vals[seg.name] = form.elements[seg.name].value;
     for (const f of fields) {
+      if (f.type === 'segment' || f.type === 'note') continue;
+      if (f.when && f.when !== vals[seg.name]) continue;
       const el = form.elements[f.name];
       if (f.type === 'checkbox') { vals[f.name] = el.checked; continue; }
       const raw = el.value.trim();
       if (f.type === 'number') {
-        if (raw === '') { if (f.required) return fail(`${f.label} is required.`); vals[f.name] = 0; continue; }
+        if (raw === '') { if (f.required) return fail(f.requiredMsg || `${f.label} is required.`); vals[f.name] = 0; continue; }
         const n = Number(raw);
         if (!Number.isFinite(n) || n < 0) return fail(`${f.label} must be a positive number.`);
         vals[f.name] = Math.round(n * 100) / 100;
@@ -1016,7 +1053,7 @@ function openForm({ title, fields, submitLabel = 'Save', onSubmit, after }) {
         if (!name) return fail('Please type a name for the new category.');
         vals[f.name] = { newName: name };
       } else {
-        if (f.required && !raw) return fail(`${f.label} is required.`);
+        if (f.required && !raw) return fail(f.requiredMsg || `${f.label} is required.`);
         vals[f.name] = raw;
       }
     }
@@ -1073,7 +1110,7 @@ const SCHEMAS = {
     { name: 'label', label: 'Description', placeholder: 'e.g. Groceries, Netflix, Petrol' },
     { name: 'amount', label: 'Amount', type: 'number', required: true }] },
   installments: { noun: 'installment', fields: () => [
-    { name: 'name', label: 'What is it for?', required: true, placeholder: 'e.g. iPhone 16 (Maybank CC)' },
+    { name: 'name', label: 'What is it for?', required: true, requiredMsg: 'Please say what the installment is for.', placeholder: 'e.g. iPhone 16 (Maybank CC)' },
     categoryField(),
     { name: 'monthly', label: 'Monthly payment', type: 'number', required: true },
     { name: 'months', label: 'Number of months', type: 'int', required: true, min: 1, max: 120, placeholder: 'e.g. 12' },
@@ -1084,9 +1121,12 @@ const SCHEMAS = {
     { name: 'type', label: 'Type', type: 'select', options: DEBT_TYPES, value: 'Credit card' },
     { name: 'balance', label: 'Outstanding balance', type: 'number', required: true },
     { name: 'monthlyPayment', label: 'Monthly repayment', type: 'number', hint: 'Counted as spending each month.' }] },
-  wishlist: { noun: 'wish', fields: () => [
-    { name: 'name', label: 'What do you wish for?', required: true, placeholder: 'e.g. Japan trip, new laptop' },
-    { name: 'cost', label: 'Estimated cost', type: 'number' },
+  wishlist: { noun: 'goal', fields: () => [
+    { name: 'kind', label: 'Type', type: 'segment', value: 'do',
+      options: [{ value: 'do', label: GOAL_KINDS.do }, { value: 'buy', label: GOAL_KINDS.buy }],
+      onChange: (k, form) => { form.elements['name'].placeholder = k === 'buy' ? 'e.g. Japan trip, new laptop' : 'e.g. Run a half marathon, read 12 books'; } },
+    { name: 'name', label: 'Goal', required: true, placeholder: 'e.g. Run a half marathon, read 12 books' },
+    { name: 'cost', label: 'Estimated cost', type: 'number', when: 'buy' },
     { name: 'done', label: 'Done', type: 'checkbox', value: false }] },
   categories: { noun: 'category', fields: () => [
     { name: 'name', label: 'Category name', required: true, placeholder: 'e.g. Groceries' }] }
@@ -1104,21 +1144,60 @@ function editItem(list, id, after) {
   const arr = getList(list);
   const item = id ? arr.find((x) => x.id === id) : null;
   if (id && !item) return;
+  if (list === 'expenses' && !item) return addExpense();
   const cap = schema.noun[0].toUpperCase() + schema.noun.slice(1);
   openForm({
     title: item ? `Edit ${schema.noun}` : `Add ${schema.noun}`,
     submitLabel: item ? 'Save changes' : `Add ${schema.noun}`,
-    fields: schema.fields().map((f) => ({ ...f, value: item ? item[f.name] : f.value })),
+    fields: schema.fields().map((f) => ({ ...f, value: item && f.name in item ? item[f.name] : f.value })),
     after,
     onSubmit(v) {
       if (list === 'categories' && state.categories.some((c) => c !== item && c.name.toLowerCase() === v.name.toLowerCase())) return 'A category with that name already exists.';
       if (list === 'installments' && !MONTH_RE.test(v.start)) return 'Please enter the first payment month as YYYY-MM.';
+      if (list === 'wishlist' && v.kind !== 'buy') v.cost = 0;
       if (item) Object.assign(item, v); else arr.push({ id: uid(), ...v });
-      let msg = item ? `${cap} updated` : `${cap} added`;
-      if (list === 'installments' && !instAt(v, ui.month).active) {
-        msg += monthDiff(v.start, ui.month) < 0 ? ` · starts ${monthLabel(v.start)}` : ` · finished ${monthLabel(instAt(v, ui.month).end)}`;
+      const msg = item ? `${cap} updated` : `${cap} added`;
+      toast(list === 'installments' ? instToast(v, msg) : msg);
+    }
+  });
+}
+
+// Adds " · starts Mon YYYY" / " · finished Mon YYYY" when the plan isn't due in the month being viewed.
+function instToast(p, msg) {
+  const s = instAt(p, ui.month);
+  if (s.active) return msg;
+  return msg + (monthDiff(p.start, ui.month) < 0 ? ` · starts ${monthLabel(p.start)}` : ` · finished ${monthLabel(s.end)}`);
+}
+
+// One form for both kinds of spending: a one-time expense (this month) or an installment plan (repeats monthly).
+function addExpense() {
+  openForm({
+    title: 'Add expense',
+    submitLabel: 'Add expense',
+    fields: [
+      { name: 'kind', label: 'Type', type: 'segment', value: 'once',
+        options: [{ value: 'once', label: 'One-time' }, { value: 'installment', label: 'Installment' }],
+        onChange: (k, form) => { $('button[type=submit]', form).textContent = k === 'installment' ? 'Add installment' : 'Add expense'; } },
+      { name: 'instNote', type: 'note', when: 'installment', label: 'Set it up once. It appears in your expenses every month (e.g. 3/12) until the last payment.' },
+      categoryField(),
+      { name: 'label', label: 'Description', placeholder: 'e.g. Groceries, Netflix, Petrol', when: 'once' },
+      { name: 'amount', label: 'Amount', type: 'number', required: true, when: 'once' },
+      { name: 'name', label: 'What is it for?', required: true, requiredMsg: 'Please say what the installment is for.', placeholder: 'e.g. iPhone 16 (Maybank CC)', when: 'installment' },
+      { name: 'monthly', label: 'Monthly payment', type: 'number', required: true, when: 'installment' },
+      { name: 'months', label: 'Number of months', type: 'int', required: true, min: 1, max: 120, placeholder: 'e.g. 12', when: 'installment' },
+      { name: 'start', label: 'First payment month', type: 'month', required: true, value: ui.month, placeholder: 'YYYY-MM', when: 'installment',
+        hint: 'Already started? Pick the month of your first payment and the app counts from there.' }
+    ],
+    onSubmit(v) {
+      if (v.kind === 'installment') {
+        if (!MONTH_RE.test(v.start)) return 'Please enter the first payment month as YYYY-MM.';
+        const p = { id: uid(), name: v.name, categoryId: v.categoryId, monthly: v.monthly, months: v.months, start: v.start };
+        state.installments.push(p);
+        toast(instToast(p, 'Installment added'));
+      } else {
+        cur().expenses.push({ id: uid(), categoryId: v.categoryId, label: v.label, amount: v.amount });
+        toast('Expense added');
       }
-      toast(msg);
     }
   });
 }
@@ -1183,7 +1262,7 @@ function toggleWish(id) {
   if (!item) return;
   item.done = !item.done;
   persist();
-  if (item.done) toast(`Ticked off: ${item.name} 🎉`);
+  if (item.done) toast(`Done: ${item.name} 🎉`);
 }
 
 /* ---------- Months ---------- */
@@ -1258,10 +1337,11 @@ function demoState() {
   ];
   const y = end.slice(0, 4);
   s.wishlist[y] = [
-    { id: uid(), name: 'Noise-cancelling headphones', cost: 1200, done: true },
-    { id: uid(), name: 'Japan trip', cost: 9000, done: false },
-    { id: uid(), name: 'Standing desk', cost: 1500, done: true },
-    { id: uid(), name: 'Online investing course', cost: 600, done: false }
+    { id: uid(), name: 'Run a half marathon', kind: 'do', cost: 0, done: false },
+    { id: uid(), name: 'Read 12 books', kind: 'do', cost: 0, done: true },
+    { id: uid(), name: 'Learn to swim', kind: 'do', cost: 0, done: false },
+    { id: uid(), name: 'Japan trip', kind: 'buy', cost: 9000, done: false },
+    { id: uid(), name: 'Noise-cancelling headphones', kind: 'buy', cost: 1200, done: true }
   ];
   return s;
 }
@@ -1303,7 +1383,7 @@ function importData(file) {
 function resetAll() {
   confirmDialog({
     title: 'Reset everything?',
-    message: 'All months, installments, your goal and wishlist will be <b>permanently erased</b> from this browser. This cannot be undone.',
+    message: 'All months, installments, your portfolio goal and year goals will be <b>permanently erased</b> from this browser. This cannot be undone.',
     confirmLabel: 'Erase all data',
     onConfirm() { const theme = state.settings.theme; state = defaultState(); state.settings.theme = theme; ui.month = null; persist(); toast('All data erased'); }
   });
@@ -1316,7 +1396,7 @@ function applyTheme() {
 }
 
 /* ---------- Events ---------- */
-// Scrolls to the Portfolio / Expenses / Wishlist editor and briefly highlights it.
+// Scrolls to the Portfolio / Expenses / Goals editor and briefly highlights it.
 function jumpToEditor() {
   const el = $('#editor');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;

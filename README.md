@@ -23,9 +23,9 @@ Track your portfolio, monthly expenses, installments and debts, and watch your n
 | **Breakdowns** | Doughnut charts for portfolio allocation (by asset type) and spending (by category, including installments and debt repayments) |
 | **Portfolio** | Set a target for your total portfolio and track progress. Add, edit and delete assets (cash, savings, FD, stocks, ETFs, crypto, EPF, gold, property…) |
 | **Expenses** | Monthly income, what you spent and what's left to save. Add expenses by category (create a new category straight from the form, or use **Categories** to rename or delete them) |
-| **Installments** | Set up a plan once (monthly amount, number of months, first payment month). Every month it appears in your expenses as e.g. *Installment 4/12* automatically, the amount still owed counts as debt, and it stops after the last payment |
+| **Installments** | In **Add expense**, switch the type to **Installment** and enter it once (monthly amount, number of months, first payment month). Every month it appears in your expenses as e.g. *Installment 4/12* automatically, the amount still owed counts as debt, and it stops after the last payment |
 | **Debts** | Loans and card balances with monthly repayments. Repayments count as spending automatically |
-| **Wishlist** | A wishlist for each year with estimated cost. Tick items off as you get them |
+| **Goals** | A list for each year with two kinds of goal: **Year goals** (things to do, e.g. *run a half marathon*) and **Spend goals** (things to buy, with an estimated cost, e.g. *Japan trip*). Tick them off as you go |
 
 > **Spent** = expenses + installment payments + debt repayments. **Left to save** = income − spent.
 
