@@ -18,7 +18,7 @@ Track your portfolio, monthly expenses, installments and debts, and watch your n
 
 | Area | What you can do |
 | --- | --- |
-| **Overview** | Three cards: **Net worth** (portfolio − debt, with the change vs last month), **Portfolio** (with progress toward your goal) and **Debt** (monthly repayments, including installments) |
+| **Overview** | A greeting with your name (set it in the **⋮ menu → Your name**) and a short update such as *“Net worth is up RM 1,343 since Sep 🎉”*. Then three cards: **Net worth** (portfolio − debt, with the change vs last month), **Portfolio** (with progress toward your goal) and **Debt** (monthly repayments, including installments) |
 | **Trends** | Line chart of net worth, portfolio and debt across all months. Click a legend chip to show or hide a line, hover for details, click a point to jump to that month |
 | **Breakdowns** | Doughnut charts for portfolio allocation (by asset type) and spending (by category, including installments and debt repayments) |
 | **Portfolio** | Set a target for your total portfolio and track progress. Add, edit and delete assets (cash, savings, FD, stocks, ETFs, crypto, EPF, gold, property…) |

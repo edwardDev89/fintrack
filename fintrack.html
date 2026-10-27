@@ -128,6 +128,9 @@
   /* Page */
   .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 32px 0 18px; flex-wrap: wrap; }
   .eyebrow { margin: 0; color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+  .greeting { margin: 0; color: var(--text-2); font-size: 14.5px; font-weight: 560; }
+  .insight { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; }
+  .insight:empty { display: none; }
   .page-head h1 { margin-top: 4px; font-size: 30px; font-weight: 680; letter-spacing: -.03em; }
   .jump-btn span { display: inline-flex; }
   .jump-btn svg.i { animation: nudge 1.6s ease-in-out 3; }
@@ -338,6 +341,7 @@
       <button class="icon-btn" id="menuBtn" data-action="menu" data-icon="more" aria-label="Menu" aria-haspopup="true" aria-expanded="false"></button>
       <div class="menu" id="menu" role="menu" hidden>
         <label class="mi-field">Currency<select id="currencySelect"></select></label>
+        <button class="mi" data-action="edit-name" data-icon="user" role="menuitem">Your name</button>
         <hr>
         <button class="mi" data-action="export" data-icon="download" role="menuitem">Export backup (JSON)</button>
         <button class="mi" data-action="import" data-icon="upload" role="menuitem">Import backup</button>
@@ -372,8 +376,9 @@
   <section id="dash" hidden>
     <div class="page-head">
       <div>
-        <p class="eyebrow">Overview</p>
+        <p class="greeting" id="greeting"></p>
         <h1 id="pageTitle"></h1>
+        <p class="insight" id="insight"></p>
       </div>
       <button class="btn btn-soft jump-btn" data-action="jump-edit" title="Go to the section where you add and edit your numbers">Edit your numbers<span data-icon="down"></span></button>
     </div>
@@ -461,6 +466,7 @@ const I = {
   sparkles: ico('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 17v4M17 19h4"/>'),
   reset: ico('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'),
   check: ico('<path d="M20 6 9 17l-5-5"/>'),
+  user: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
   down: ico('<path d="M12 5v14M19 12l-7 7-7-7"/>'),
   x: ico('<path d="M18 6 6 18M6 6l12 12"/>')
 };
@@ -482,7 +488,7 @@ const monthDiff = (a, b) => { const [ay, am] = a.split('-').map(Number), [by, bm
 function defaultState() {
   return {
     version: 2,
-    settings: { currency: 'MYR', theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', hidden: [] },
+    settings: { currency: 'MYR', theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', hidden: [], name: '' },
     categories: DEFAULT_CATEGORIES.map((name) => ({ id: uid(), name })),
     portfolioGoal: 0,
     installments: [],
@@ -506,6 +512,7 @@ function normalize(d) {
   if (CURRENCIES.some((c) => c[0] === s.currency)) out.settings.currency = s.currency;
   if (s.theme === 'dark' || s.theme === 'light') out.settings.theme = s.theme;
   out.settings.hidden = Array.isArray(s.hidden) ? s.hidden.filter((x) => SERIES.some((sr) => sr.key === x)) : [];
+  out.settings.name = str(s.name).trim().slice(0, 40);
   if (Array.isArray(d.categories)) out.categories = objs(d.categories).map((c) => ({ id: id(c.id), name: str(c.name, 'Unnamed') }));
   out.portfolioGoal = num(d.portfolioGoal);
   out.installments = objs(d.installments)
@@ -777,10 +784,50 @@ function render() {
   $('#currencySelect').value = state.settings.currency;
   if (!has) return;
   renderMonthNav(keys);
+  renderGreeting(keys);
   renderSummary(keys);
   renderTrend(keys);
   renderDonuts();
   renderTabs();
+}
+
+function renderGreeting(keys) {
+  const h = new Date().getHours();
+  const [hello, emoji] = h >= 5 && h < 12 ? ['Good morning', ' ☀️'] : h >= 12 && h < 18 ? ['Good afternoon', ' 👋'] : ['Good evening', ' 🌙'];
+  const name = state.settings.name;
+  $('#greeting').textContent = `${hello}${name ? `, ${name}` : ''}${emoji}`;
+  $('#insight').textContent = insights(keys).slice(0, 2).join(' · ');
+}
+
+// Short, encouraging one-liners built from the month being viewed, most relevant first.
+function insights(keys) {
+  const m = cur(), t = totals(ui.month);
+  const i = keys.indexOf(ui.month);
+  const p = i > 0 ? totals(keys[i - 1]) : null;
+  const when = ui.month === currentKey() ? 'this month' : `in ${monthLabel(ui.month, { month: 'short' })}`;
+  const out = [];
+  if (!m.assets.length && !m.expenses.length && !m.income && !m.debts.length) {
+    return ['Add your income, assets and expenses below to see your summary here.'];
+  }
+  activeInstallments(ui.month).filter(({ p: plan, s }) => s.n === plan.months)
+    .forEach(({ p: plan }) => out.push(`Last payment for ${plan.name} ${when} 🎉`));
+  if (p) {
+    const d = t.netWorth - p.netWorth;
+    const since = monthLabel(keys[i - 1], { month: 'short' });
+    if (d >= 1) out.push(`Net worth is up ${money(d, true)} since ${since} 🎉`);
+    else if (d <= -1) out.push(`Net worth dipped ${money(-d, true)} since ${since}`);
+  }
+  if (t.income > 0) {
+    const r = t.spent / t.income;
+    if (r > 1) out.push(`You've spent ${money(t.spent - t.income, true)} more than your income ${when}`);
+    else out.push(`You've spent ${Math.round(r * 100)}% of your income ${when}, ${money(t.left, true)} left to save`);
+  }
+  const goals = state.wishlist[wishYear()] || [];
+  if (goals.length) {
+    const done = goals.filter((g) => g.done).length;
+    out.push(done === goals.length ? `All ${goals.length} goals for ${wishYear()} done, amazing! 🏆` : `${done} of ${goals.length} goals done for ${wishYear()}, keep going!`);
+  }
+  return out;
 }
 
 function renderMonthNav(keys) {
@@ -1249,6 +1296,21 @@ function editIncome() {
   });
 }
 
+// Asks for (or changes) the name used in the greeting. `welcome` is the first-run version shown after "Start this month".
+function editName(welcome) {
+  openForm({
+    title: welcome ? 'Welcome to FinTrack 👋' : 'Your name',
+    submitLabel: welcome ? 'Let’s go' : 'Save',
+    fields: [{ name: 'name', label: 'What should we call you?', placeholder: 'e.g. Edward', value: state.settings.name,
+      hint: welcome ? 'Used for your greeting. You can change it later in the ⋮ menu.' : 'Leave empty to remove it.' }],
+    after: welcome ? () => setTimeout(jumpToEditor, 60) : undefined,
+    onSubmit(v) {
+      state.settings.name = v.name.slice(0, 40);
+      toast(v.name ? `Hi, ${state.settings.name}! 👋` : welcome ? 'Let’s go! Add your first asset.' : 'Name removed');
+    }
+  });
+}
+
 function editGoal() {
   openForm({
     title: 'Portfolio goal',
@@ -1303,6 +1365,7 @@ function demoState() {
   const s = defaultState();
   s.settings.currency = state.settings.currency;
   s.settings.theme = state.settings.theme;
+  s.settings.name = state.settings.name;
   const cat = (n) => s.categories.find((c) => c.name === n).id;
   const r = Math.round;
   const N = 9, end = currentKey();
@@ -1428,7 +1491,12 @@ document.addEventListener('click', (e) => {
     case 'next-month': ui.month = keys[keys.indexOf(ui.month) + 1] || ui.month; render(); break;
     case 'add-month': addMonth(); break;
     case 'delete-month': deleteMonth(); break;
-    case 'start': state.months[currentKey()] = state.months[currentKey()] || emptyMonth(); ui.month = currentKey(); persist(); toast('Let’s go! Add your first asset.'); setTimeout(jumpToEditor, 60); break;
+    case 'start':
+      state.months[currentKey()] = state.months[currentKey()] || emptyMonth(); ui.month = currentKey(); persist();
+      if (state.settings.name) { toast('Let’s go! Add your first asset.'); setTimeout(jumpToEditor, 60); }
+      else editName(true);
+      break;
+    case 'edit-name': editName(false); break;
     case 'demo': loadDemo(); break;
     case 'export': exportData(); break;
     case 'import': $('#importFile').click(); break;
