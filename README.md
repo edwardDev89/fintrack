@@ -22,13 +22,13 @@ Track your portfolio, monthly expenses, installments and debts, and watch your n
 | **Trends** | Line chart of net worth, portfolio and debt across all months. Click a legend chip to show or hide a line, hover for details, click a point to jump to that month |
 | **Breakdowns** | Doughnut charts for portfolio allocation (by asset type) and spending (by category, including installments and debt repayments) |
 | **Portfolio** | Set a target for your total portfolio and track progress. Add, edit and delete assets (cash, savings, FD, stocks, ETFs, crypto, EPF, gold, property…) |
-| **Expenses** | Monthly income, what you spent and what's left to save. Add expenses by category (create a new category straight from the form, or use **Categories** to rename or delete them) |
+| **Monthly** | Monthly income, what's carried over from last month, what you spent and your **leftover**. Add monthly expenses by category (create a new category straight from the form, or use **Categories** to rename or delete them) |
 | **Installments** | In **Add expense**, switch the type to **Installment** and enter it once (monthly amount, number of months, first payment month). Every month it appears in your expenses as e.g. *Installment 4/12* automatically, the amount still owed counts as debt, and it stops after the last payment |
 | **Debts** | Loans and card balances with monthly repayments. Repayments count as spending automatically |
-| **Daily** | Log small everyday spending (coffee, lunch, parking) with a quick-add bar: type, amount, Enter. Entries go to today by default; tap **Yesterday** or pick an earlier date to log something you missed (you can also change the date when editing). Entries are grouped by day with daily totals, and show the month total, today and a daily average. The month's daily total appears in **Expenses** as one **Miscellaneous** row, so your main list stays clean |
+| **Daily** | Log small everyday spending (coffee, lunch, parking) with a quick-add bar: type, amount, Enter. Entries go to today by default; tap **Yesterday** or pick an earlier date to log something you missed (you can also change the date when editing). Entries are grouped by day with daily totals, and show the month total, today and a daily average. The month's daily total appears in **Monthly** as one **Miscellaneous** row, so your main list stays clean |
 | **Goals** | A list for each year with two kinds of goal: **Year goals** (things to do, e.g. *run a half marathon*) and **Spend goals** (things to buy, with an estimated cost, e.g. *Japan trip*). Tick them off as you go |
 
-> **Spent** = expenses + daily spending + installment payments + debt repayments. **Left to save** = income − spent.
+> **Spent** = expenses + daily spending + installment payments + debt repayments. **Leftover** = income + carried over − spent. Each month's leftover is carried into the next month automatically, so it works as a running **buffer** (also shown on the Net worth card). Tap **Edit** next to *Carried over* to adjust it, e.g. after moving some of it into investments. The buffer is a budgeting view only and doesn't change your portfolio or net worth.
 
 ## How to use
 

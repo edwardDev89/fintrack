@@ -236,8 +236,10 @@
   .summary-box .lbl { font-size: 12.5px; color: var(--muted); }
   .summary-box strong { display: block; font-size: 19px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .summary-box .bar { grid-column: 1 / -1; height: 8px; background: var(--surface); }
-  .summary-box .note { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); margin-top: -4px; }
-  @media (max-width: 560px) { .summary-box { grid-template-columns: repeat(2, minmax(0, 1fr)); } .summary-box > .btn { grid-column: 1 / -1; } }
+  .summary-box .note { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); margin-top: -4px; line-height: 1.7; }
+  .summary-box.summary-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) auto; }
+  @media (max-width: 760px) { .summary-box.summary-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .summary-box.summary-4 > .btn { grid-column: 1 / -1; } }
+  @media (max-width: 560px) { .summary-box { grid-template-columns: repeat(2, minmax(0, 1fr)); } .summary-box > .btn { grid-column: 1 / -1; } .summary-box strong { font-size: 16.5px; } }
   .goal-box { padding: 16px; border-radius: 14px; background: var(--surface-2); margin-bottom: 18px; }
   .goal-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
   .goal-top .lbl { font-size: 12.5px; color: var(--muted); }
@@ -463,7 +465,7 @@ const SERIES = [
   { key: 'debt', name: 'Debt', color: '--c3' }
 ];
 const PALETTE = ['#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#f43f5e', '#8b5cf6', '#22c55e', '#ec4899', '#64748b', '#eab308', '#06b6d4', '#a3a3a3'];
-const TABS = [['portfolio', 'Portfolio'], ['expenses', 'Expenses'], ['daily', 'Daily'], ['wishlist', 'Goals']];
+const TABS = [['portfolio', 'Portfolio'], ['expenses', 'Monthly'], ['daily', 'Daily'], ['wishlist', 'Goals']];
 const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const GOAL_KINDS = { do: 'Year goal', buy: 'Spend goal' };
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -562,7 +564,8 @@ function normalize(d) {
       income: num(m.income),
       assets: objs(m.assets).map((a) => ({ id: id(a.id), name: str(a.name, 'Asset'), type: str(a.type, 'Other'), value: num(a.value) })),
       expenses: objs(m.expenses).map((e) => ({ id: id(e.id), categoryId: str(e.categoryId), label: str(e.label), amount: num(e.amount) })),
-      debts: objs(m.debts).map((x) => ({ id: id(x.id), name: str(x.name, 'Debt'), type: str(x.type, 'Other'), balance: num(x.balance), monthlyPayment: num(x.monthlyPayment) }))
+      debts: objs(m.debts).map((x) => ({ id: id(x.id), name: str(x.name, 'Debt'), type: str(x.type, 'Other'), balance: num(x.balance), monthlyPayment: num(x.monthlyPayment) })),
+      carry: m.carry == null || !Number.isFinite(Number(m.carry)) ? null : Math.round(Number(m.carry) * 100) / 100
     };
   }
   return out;
@@ -633,23 +636,45 @@ function instAt(p, k) {
 const activeInstallments = (k) => state.installments.map((p) => ({ p, s: instAt(p, k) })).filter((x) => x.s.active);
 const dailyIn = (k) => state.daily.filter((e) => e.date.startsWith(k + '-'));
 
+// Income and spending for one month, without any carry-over.
+function monthFlow(k) {
+  const m = state.months[k];
+  const expenses = sum(m.expenses, 'amount');
+  const instPay = activeInstallments(k).reduce((s, x) => s + x.p.monthly, 0);
+  const payments = sum(m.debts, 'monthlyPayment');
+  const dailyList = dailyIn(k);
+  const daily = Math.round(sum(dailyList, 'amount') * 100) / 100;
+  return { expenses, instPay, payments, daily, dailyCount: dailyList.length, spent: expenses + daily + instPay + payments, income: m.income };
+}
+
+// Running buffer: each month starts with the previous tracked month's leftover, unless you set it manually (m.carry).
+// With `auto`, ignores month k's own manual value (used to show what the automatic amount would be).
+function carriedInto(k, auto = false) {
+  let buf = 0;
+  for (const key of monthKeys()) {
+    if (key > k) break;
+    const m = state.months[key];
+    const carry = m.carry != null && !(auto && key === k) ? m.carry : buf;
+    if (key === k) return carry;
+    const f = monthFlow(key);
+    buf = carry + f.income - f.spent;
+  }
+  return 0;
+}
+
 function totals(k) {
   const m = state.months[k];
   if (!m) return null;
   const portfolio = sum(m.assets, 'value');
   const instOwed = state.installments.reduce((s, p) => s + instAt(p, k).owed, 0);
   const debt = sum(m.debts, 'balance') + instOwed;
-  const expenses = sum(m.expenses, 'amount');
-  const instPay = activeInstallments(k).reduce((s, x) => s + x.p.monthly, 0);
-  const payments = sum(m.debts, 'monthlyPayment');
-  const dailyList = dailyIn(k);
-  const daily = Math.round(sum(dailyList, 'amount') * 100) / 100;
-  const spent = expenses + daily + instPay + payments;
+  const f = monthFlow(k);
+  const carried = Math.round(carriedInto(k) * 100) / 100;
+  const available = f.income + carried;
   return {
-    portfolio, debt, instOwed, expenses, daily, dailyCount: dailyList.length, instPay, payments, spent,
+    portfolio, debt, instOwed, ...f, carried, available,
     netWorth: portfolio - debt,
-    income: m.income,
-    left: m.income - spent
+    left: Math.round((available - f.spent) * 100) / 100
   };
 }
 const catName = (id) => (state.categories.find((c) => c.id === id) || {}).name || 'Uncategorized';
@@ -845,11 +870,12 @@ function insights(keys) {
     if (d >= 1) out.push(`Net worth is up ${money(d, true)} since ${since} 🎉`);
     else if (d <= -1) out.push(`Net worth dipped ${money(-d, true)} since ${since}`);
   }
-  if (t.income > 0) {
-    const r = t.spent / t.income;
-    if (r > 1) out.push(`You've spent ${money(t.spent - t.income, true)} more than your income ${when}`);
-    else out.push(`You've spent ${Math.round(r * 100)}% of your income ${when}, ${money(t.left, true)} left to save`);
+  if (t.available > 0) {
+    const r = t.spent / t.available;
+    if (r > 1) out.push(`You've spent ${money(t.spent - t.available, true)} more than you had available ${when}`);
+    else out.push(`You've spent ${Math.round(r * 100)}% of what's available ${when}, ${money(t.left, true)} leftover`);
   }
+  if (t.carried >= 1 && p) out.push(`${money(t.carried, true)} carried over from ${monthLabel(keys[i - 1], { month: 'short' })}`);
   const goals = state.wishlist[wishYear()] || [];
   if (goals.length) {
     const done = goals.filter((g) => g.done).length;
@@ -888,8 +914,10 @@ function renderSummary(keys) {
       <div class="stat-sub">${sub}</div>
     </div>`;
 
+  const bufferLine = t.available !== 0 || t.carried !== 0
+    ? `<span>Buffer <b class="${t.left < 0 ? 'neg' : ''}">${esc(money(t.left))}</b> leftover</span>` : '';
   const net = card('featured', 'Net worth', '--c1', esc(money(t.netWorth)),
-    `<span><b>${esc(money(t.portfolio))}</b> portfolio − <b>${esc(money(t.debt))}</b> debt</span>${delta('netWorth', true)}`, money(t.netWorth));
+    `<span><b>${esc(money(t.portfolio))}</b> portfolio − <b>${esc(money(t.debt))}</b> debt</span>${bufferLine}${delta('netWorth', true)}`, money(t.netWorth));
 
   let goalLine;
   if (state.portfolioGoal > 0) {
@@ -935,7 +963,7 @@ function renderDonuts() {
   if (t.payments > 0) add('Debt repayments', t.payments);
   const items = (o) => Object.entries(o).map(([label, value]) => ({ label, value }));
   donut($('#assetDonut'), items(assets), 'Portfolio', 'Add assets in the Portfolio tab to see your allocation');
-  donut($('#expenseDonut'), items(spend), 'Spent', 'Add expenses in the Expenses tab to see the breakdown');
+  donut($('#expenseDonut'), items(spend), 'Spent', 'Add expenses in the Monthly or Daily tab to see the breakdown');
 }
 
 function renderTabs() {
@@ -984,7 +1012,7 @@ function addDaily(form) {
   let msg = `${label || DAILY_LABEL} · ${money(amount)} added${date === todayKey() ? '' : ` to ${dayLabel(date).toLowerCase() === 'yesterday' ? 'yesterday' : fmtDay(date)}`}`;
   if (!state.months[k]) {
     const prev = monthKeys().filter((x) => x < k).pop();
-    state.months[k] = prev ? clone(state.months[prev]) : emptyMonth();
+    state.months[k] = prev ? copyMonth(state.months[prev]) : emptyMonth();
     msg = `Started ${monthLabel(k, { month: 'long', year: 'numeric' })}${prev ? ` (copied from ${monthLabel(prev, { month: 'short' })})` : ''} · ${msg}`;
   }
   if (ui.month !== k) ui.month = k;
@@ -995,7 +1023,7 @@ function addDaily(form) {
 
 const panelHead = (title, sub, list, addLabel, extra = '') => `
   <div class="panel-head">
-    <div><h3>${title}</h3><p>${sub}</p></div>
+    <div><h3>${title}</h3>${sub ? `<p>${sub}</p>` : ''}</div>
     <div class="chips">${extra}${list ? `<button class="btn btn-primary" data-action="add" data-list="${list}">${I.plus}${addLabel}</button>` : ''}</div>
   </div>`;
 const actions = (list, id) => `
@@ -1036,18 +1064,26 @@ const PANELS = {
   },
   expenses() {
     const m = cur(), t = totals(ui.month);
-    const r = t.income > 0 ? t.spent / t.income : 0;
+    const keys = monthKeys(), prevKey = keys[keys.indexOf(ui.month) - 1];
+    const r = t.available > 0 ? t.spent / t.available : 0;
     const parts = [`expenses ${esc(money(t.expenses))}`];
     if (t.daily > 0) parts.push(`daily ${esc(money(t.daily))}`);
     if (t.instPay > 0) parts.push(`installments ${esc(money(t.instPay))}`);
     if (t.payments > 0) parts.push(`debt repayments ${esc(money(t.payments))}`);
-    const box = `<div class="summary-box">
+    const signed = (v) => `${v < 0 ? '−' : '+'} ${esc(money(Math.abs(v)))}`;
+    const carryNote = m.carry != null
+      ? `Carried over set manually · <button class="link" data-action="edit-carry">Edit</button>`
+      : prevKey ? `Carried over = ${esc(monthLabel(prevKey, { month: 'short' }))}'s leftover · <button class="link" data-action="edit-carry">Edit</button>`
+      : `Nothing carried over yet · <button class="link" data-action="edit-carry">Set a starting buffer</button>`;
+    const usage = t.available > 0 ? `Spent ${Math.round(r * 100)}% of ${esc(money(t.available))} available` : 'Set your income to see your leftover';
+    const box = `<div class="summary-box summary-4">
       <div><div class="lbl">Income</div><strong>${esc(money(t.income))}</strong></div>
+      <div><div class="lbl">Carried over</div><strong class="${t.carried < 0 ? 'neg' : ''}">${signed(t.carried)}</strong></div>
       <div><div class="lbl">Spent</div><strong>${esc(money(t.spent))}</strong></div>
-      <div><div class="lbl">Left to save</div><strong class="${t.left < 0 ? 'neg' : 'pos'}">${esc(money(t.left))}</strong></div>
+      <div><div class="lbl">Leftover</div><strong class="${t.left < 0 ? 'neg' : 'pos'}">${esc(money(t.left))}</strong></div>
       <button class="btn btn-ghost" data-action="edit-income">${I.edit}Income</button>
-      ${t.income > 0 ? bar(r, r > 1 ? 'over' : r > 0.85 ? 'warn' : 'ok') : ''}
-      <div class="note">${t.income > 0 ? `Spent ${Math.round(r * 100)}% of income · ` : 'Set your income to see what’s left · '}Spent = ${parts.join(' + ')}</div>
+      ${t.available > 0 ? bar(r, r > 1 ? 'over' : r > 0.85 ? 'warn' : 'ok') : ''}
+      <div class="note">${usage} · ${carryNote}<br>Spent = ${parts.join(' + ')}</div>
     </div>`;
 
     const rows = m.expenses.map((e) => ({ cat: catName(e.categoryId), amount: e.amount, html: row('expenses', e.id, e.label || catName(e.categoryId),
@@ -1067,7 +1103,8 @@ const PANELS = {
     }
     rows.sort((a, b) => a.cat.localeCompare(b.cat) || b.amount - a.amount);
     const extra = `<button class="btn btn-ghost" data-action="manage-categories">Categories</button>`;
-    const expenses = `<div class="section">${panelHead('Expenses', `${rows.length} item${rows.length === 1 ? '' : 's'} · ${esc(money(t.expenses + t.daily + t.instPay))}`, 'expenses', 'Add expense', extra)}
+    const head = panelHead('Monthly expenses', `${rows.length} item${rows.length === 1 ? '' : 's'} · ${esc(money(t.expenses + t.daily + t.instPay))}`, 'expenses', 'Add expense', extra);
+    const expenses = `<div class="section">
       ${rows.length ? `<ul class="list">${rows.map((x) => x.html).join('')}</ul>` : emptyList('No expenses for this month yet. Paying by installment? Choose <b>Installment</b> in <b>Add expense</b> and it will repeat every month for you.')}</div>`;
 
     const debts = m.debts.slice().sort((a, b) => b.balance - a.balance);
@@ -1077,7 +1114,7 @@ const PANELS = {
       ${debts.length ? `<ul class="list">${debts.map((d) => row('debts', d.id, d.name,
         `<span class="badge">${esc(d.type)}</span>${d.monthlyPayment > 0 ? `<span>${esc(money(d.monthlyPayment))}/mo${d.balance > 0 ? ` · ~${Math.ceil(d.balance / d.monthlyPayment)} months left` : ''}</span>` : ''}`,
         esc(money(d.balance)))).join('')}</ul>` : emptyList('No debts. Nice! Add loans or credit card balances here. Monthly repayments count as spending.')}</div>`;
-    return box + expenses + debtHtml;
+    return head + box + expenses + debtHtml;
   },
   daily() {
     const t = totals(ui.month);
@@ -1102,7 +1139,7 @@ const PANELS = {
       <div><div class="lbl">${isCurrent ? 'This month' : monthLabel(ui.month, { month: 'long' })}</div><strong>${esc(money(t.daily))}</strong></div>
       <div><div class="lbl">${isCurrent ? 'Today' : 'Days logged'}</div><strong>${isCurrent ? esc(money(todayTotal)) : groups.length}</strong></div>
       <div><div class="lbl">Daily average</div><strong>${esc(money(Math.round((t.daily / daysSoFar) * 100) / 100))}</strong></div>
-      <div class="note">Counts as <b>${MISC_LABEL}</b> in your Expenses.</div>
+      <div class="note">Counts as <b>${MISC_LABEL}</b> in your Monthly expenses.</div>
     </div>`;
     const sel = dailyDate();
     const quick = `<div class="date-bar" id="dailyDateBar">
@@ -1123,7 +1160,7 @@ const PANELS = {
         <ul class="list">${g.items.map((e) => row('daily', e.id, e.label, '', esc(money(e.amount)))).join('')}</ul>
       </div>`).join('')
       : emptyList(`No daily spending logged for ${esc(monthLabel(ui.month, { month: 'long' }))} yet. Coffee, lunch, parking: add them above as they happen.`);
-    return panelHead('Daily expenses', 'Small everyday spending, kept out of your main expenses list') + box + quick + list;
+    return panelHead('Daily expenses', '') + box + quick + list;
   },
   wishlist() {
     const y = wishYear();
@@ -1222,7 +1259,7 @@ function openForm({ title, fields, submitLabel = 'Save', onSubmit, after }) {
       if (f.type === 'checkbox') { vals[f.name] = el.checked; continue; }
       const raw = el.value.trim();
       if (f.type === 'number') {
-        if (raw === '') { if (f.required) return fail(f.requiredMsg || `${f.label} is required.`); vals[f.name] = 0; continue; }
+        if (raw === '') { if (f.required) return fail(f.requiredMsg || `${f.label} is required.`); vals[f.name] = f.emptyNull ? null : 0; continue; }
         const n = Number(raw);
         if (!Number.isFinite(n) || n < 0) return fail(`${f.label} must be a positive number.`);
         vals[f.name] = Math.round(n * 100) / 100;
@@ -1453,6 +1490,19 @@ function editName(welcome) {
   });
 }
 
+// Lets you override how much is carried into this month (e.g. after moving part of the buffer into investments).
+function editCarry() {
+  const k = ui.month, m = cur();
+  const keys = monthKeys(), prevKey = keys[keys.indexOf(k) - 1];
+  const auto = Math.round(carriedInto(k, true) * 100) / 100;
+  openForm({
+    title: `Carried over into ${monthLabel(k, { month: 'long' })}`,
+    fields: [{ name: 'carry', label: 'Amount carried over', type: 'number', emptyNull: true, value: m.carry == null ? '' : m.carry,
+      hint: prevKey ? `Leave empty to use the automatic amount: ${money(auto)} (${monthLabel(prevKey, { month: 'short' })}'s leftover).` : 'Your starting buffer, e.g. cash you already had set aside. Leave empty for RM 0.' }],
+    onSubmit(v) { m.carry = v.carry; toast(v.carry == null ? 'Using the automatic carry-over' : 'Carry-over updated'); }
+  });
+}
+
 function editGoal() {
   openForm({
     title: 'Portfolio goal',
@@ -1470,7 +1520,9 @@ function toggleWish(id) {
 }
 
 /* ---------- Months ---------- */
-const emptyMonth = () => ({ income: 0, assets: [], expenses: [], debts: [] });
+const emptyMonth = () => ({ income: 0, assets: [], expenses: [], debts: [], carry: null });
+// A new month starts as a copy of an earlier one, but its carry-over is always automatic.
+const copyMonth = (src) => Object.assign(clone(src), { carry: null });
 
 function addMonth() {
   const keys = monthKeys();
@@ -1487,7 +1539,7 @@ function addMonth() {
       if (!MONTH_RE.test(v.month)) return 'Please enter a month as YYYY-MM.';
       if (state.months[v.month]) return 'That month already exists.';
       const source = keys.filter((k) => k < v.month).pop() || keys[0];
-      state.months[v.month] = v.copy && source ? clone(state.months[source]) : emptyMonth();
+      state.months[v.month] = v.copy && source ? copyMonth(state.months[source]) : emptyMonth();
       ui.month = v.month;
       toast(`${monthLabel(v.month, { month: 'long', year: 'numeric' })} created`);
     }
@@ -1676,6 +1728,7 @@ document.addEventListener('click', (e) => {
     case 'edit': editItem(list, id, list === 'categories' ? manageCategories : undefined); break;
     case 'delete': deleteItem(list, id, list === 'categories' ? manageCategories : undefined); break;
     case 'edit-income': editIncome(); break;
+    case 'edit-carry': editCarry(); break;
     case 'edit-goal': editGoal(); break;
     case 'toggle-wish': toggleWish(id); break;
     case 'manage-categories': manageCategories(); break;

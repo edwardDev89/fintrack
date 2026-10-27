@@ -1,6 +1,6 @@
 // Offline support: caches the app so it opens without internet once visited.
 // Bump VERSION whenever fintrack.html (or another cached file) changes.
-const VERSION = 'fintrack-v5';
+const VERSION = 'fintrack-v6';
 const ASSETS = ['./fintrack.html', './manifest.webmanifest', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
