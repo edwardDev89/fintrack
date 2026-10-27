@@ -998,7 +998,7 @@ function dailyNote(d) {
     : `<span class="pos-accent">Adding to ${esc(dayLabel(d) === 'Yesterday' ? `yesterday, ${full}` : full)}</span> · <button type="button" class="link" data-action="daily-date" data-date="${today}">back to today</button>`;
 }
 function setDailyDate(d) {
-  const today = todayKey(), yest = yesterdayKey();
+  const today = todayKey();
   if (!DATE_RE.test(d) || d > today) d = today;
   ui.dailyDate = d === today ? null : d;
   const bar = $('#dailyDateBar');
@@ -1006,7 +1006,7 @@ function setDailyDate(d) {
   $$('.date-chip', bar).forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.date === d)));
   const inp = $('#dailyDate');
   inp.value = d;
-  inp.classList.toggle('on', d !== today && d !== yest);
+  inp.classList.toggle('on', d !== today);
   $('#dailyNote').innerHTML = dailyNote(d);
 }
 
@@ -1132,7 +1132,7 @@ const PANELS = {
   },
   daily() {
     const t = totals(ui.month);
-    const today = todayKey(), yest = yesterdayKey();
+    const today = todayKey();
     const isCurrent = ui.month === currentKey();
     const dayName = dayLabel;
 
@@ -1159,8 +1159,7 @@ const PANELS = {
     const quick = `<div class="date-bar" id="dailyDateBar">
         <span class="lbl">Date</span>
         <button type="button" class="date-chip" data-action="daily-date" data-date="${today}" aria-pressed="${sel === today}">Today</button>
-        <button type="button" class="date-chip" data-action="daily-date" data-date="${yest}" aria-pressed="${sel === yest}">Yesterday</button>
-        <input type="date" id="dailyDate" class="${sel !== today && sel !== yest ? 'on' : ''}" value="${sel}" max="${today}" aria-label="Pick an earlier date">
+        <input type="date" id="dailyDate" class="${sel !== today ? 'on' : ''}" value="${sel}" max="${today}" aria-label="Pick an earlier date">
       </div>
       <form class="quick-add" id="dailyForm" autocomplete="off" novalidate>
         <input type="text" id="dailyLabel" placeholder="What was it? e.g. Lunch, Grab, Coffee" maxlength="80" aria-label="Description">
