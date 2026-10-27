@@ -34,7 +34,8 @@ Track your portfolio, monthly expenses, installments and debts, and watch your n
 1. **Computer:** double-click `fintrack.html` to open it in Chrome, Edge, Firefox or Safari. **Phone:** see the next section.
 2. Click **Start this month**, or **Try with demo data** to explore first.
 3. Each month, click **+ Month**. Keep “Copy all entries from the previous month” ticked, then update the numbers. Installments move forward on their own.
-4. Use ← / → (or the arrows in the header) to move between months.
+4. Tap **Edit your numbers ↓** (next to the month title) to jump straight to where you add and edit your numbers.
+5. Use ← / → (or the arrows in the header) to move between months.
 
 ## Use it on iPhone or Android
 

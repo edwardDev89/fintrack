@@ -129,6 +129,12 @@
   .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 32px 0 18px; flex-wrap: wrap; }
   .eyebrow { margin: 0; color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
   .page-head h1 { margin-top: 4px; font-size: 30px; font-weight: 680; letter-spacing: -.03em; }
+  .jump-btn span { display: inline-flex; }
+  .jump-btn svg.i { animation: nudge 1.6s ease-in-out 3; }
+  .editor { scroll-margin-top: 80px; }
+  .editor.flash { animation: flash 1.4s ease-out; }
+  @keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+  @keyframes flash { 0% { box-shadow: 0 0 0 0 var(--accent-soft), var(--shadow); border-color: var(--accent); } 30% { box-shadow: 0 0 0 8px var(--accent-soft); border-color: var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
   .stack > * + * { margin-top: 12px; }
   .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -295,8 +301,9 @@
     .topbar-inner { flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; row-gap: 10px; }
     .month-nav { order: 3; width: 100%; justify-content: space-between; }
     .month-select { flex: 1; }
-    .page-head { padding-top: 22px; }
+    .page-head { padding-top: 22px; align-items: center; }
     .page-head h1 { font-size: 24px; }
+    .editor { scroll-margin-top: 136px; }
     .stat-value { font-size: 21px; }
     .card { padding: 16px; }
     .hide-sm { display: none; }
@@ -357,6 +364,7 @@
         <p class="eyebrow">Overview</p>
         <h1 id="pageTitle"></h1>
       </div>
+      <button class="btn btn-soft jump-btn" data-action="jump-edit" title="Go to the section where you add and edit your numbers">Edit your numbers<span data-icon="down"></span></button>
     </div>
     <div class="stack">
       <div class="stats" id="summary"></div>
@@ -377,7 +385,7 @@
           <div id="expenseDonut"></div>
         </div>
       </div>
-      <div class="card">
+      <div class="card editor" id="editor">
         <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
         <div id="tabPanel"></div>
       </div>
@@ -441,6 +449,7 @@ const I = {
   sparkles: ico('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 17v4M17 19h4"/>'),
   reset: ico('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'),
   check: ico('<path d="M20 6 9 17l-5-5"/>'),
+  down: ico('<path d="M12 5v14M19 12l-7 7-7-7"/>'),
   x: ico('<path d="M18 6 6 18M6 6l12 12"/>')
 };
 
@@ -1307,6 +1316,17 @@ function applyTheme() {
 }
 
 /* ---------- Events ---------- */
+// Scrolls to the Portfolio / Expenses / Wishlist editor and briefly highlights it.
+function jumpToEditor() {
+  const el = $('#editor');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
+}
+$('#editor').addEventListener('animationend', (e) => { if (e.target.id === 'editor') e.target.classList.remove('flash'); });
+
 function toggleMenu(force) {
   const menu = $('#menu');
   const open = force != null ? force : menu.hidden;
@@ -1328,14 +1348,15 @@ document.addEventListener('click', (e) => {
     case 'next-month': ui.month = keys[keys.indexOf(ui.month) + 1] || ui.month; render(); break;
     case 'add-month': addMonth(); break;
     case 'delete-month': deleteMonth(); break;
-    case 'start': state.months[currentKey()] = state.months[currentKey()] || emptyMonth(); ui.month = currentKey(); persist(); toast('Let’s go! Add your first asset.'); break;
+    case 'start': state.months[currentKey()] = state.months[currentKey()] || emptyMonth(); ui.month = currentKey(); persist(); toast('Let’s go! Add your first asset.'); setTimeout(jumpToEditor, 60); break;
     case 'demo': loadDemo(); break;
     case 'export': exportData(); break;
     case 'import': $('#importFile').click(); break;
     case 'reset': resetAll(); break;
+    case 'jump-edit': jumpToEditor(); break;
     case 'tab':
       ui.tab = b.dataset.tab; renderTabs();
-      if (!b.closest('#tabs')) $('#tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!b.closest('#tabs')) jumpToEditor();
       break;
     case 'toggle-series': {
       const h = state.settings.hidden, k = b.dataset.key;
