@@ -1,7 +1,7 @@
 # FinTrack · Personal Finance Dashboard
 
 A minimalist, **fully offline** personal finance dashboard for desktop, **iPhone and Android**.
-Track your portfolio, monthly expenses, debts and savings, and watch your net worth over time.
+Track your portfolio, monthly expenses, installments and debts, and watch your net worth over time.
 
 - The whole app lives in `fintrack.html` (HTML, CSS and JavaScript, no libraries, no internet needed, charts included)
 - Your data stays **in your own browser** (`localStorage`). Nothing is uploaded anywhere.
@@ -18,21 +18,22 @@ Track your portfolio, monthly expenses, debts and savings, and watch your net wo
 
 | Area | What you can do |
 | --- | --- |
-| **Overview** | Net worth (assets − debts), portfolio, debt, expenses vs budget, savings & savings rate, plus the change vs the previous month |
-| **Trends** | Line chart of net worth, portfolio, debt, expenses and savings across all months. Click a legend chip to show or hide a line, hover for details, click a point to jump to that month |
-| **Breakdowns** | Doughnut charts for portfolio allocation (by asset type) and expenses (by category) |
-| **Portfolio** | Add, edit and delete assets (cash, savings, FD, stocks, ETFs, crypto, EPF, gold, property…) |
-| **Expenses** | Add, edit and delete expenses per category, with per-category budget bars (green / amber / red) |
-| **Debts** | Add, edit and delete loans and cards with outstanding balance and monthly repayment (shows months left) |
-| **Savings** | Monthly income plus what you saved this month and your savings rate |
-| **Goals** | Savings goals with progress bars and the required monthly amount to hit the target date |
-| **Budgets** | Manage expense categories and monthly budgets |
+| **Overview** | Three cards: **Net worth** (portfolio − debt, with the change vs last month), **Portfolio** (with progress toward your goal) and **Debt** (monthly repayments, including installments) |
+| **Trends** | Line chart of net worth, portfolio and debt across all months. Click a legend chip to show or hide a line, hover for details, click a point to jump to that month |
+| **Breakdowns** | Doughnut charts for portfolio allocation (by asset type) and spending (by category, including installments and debt repayments) |
+| **Portfolio** | Set a target for your total portfolio and track progress. Add, edit and delete assets (cash, savings, FD, stocks, ETFs, crypto, EPF, gold, property…) |
+| **Expenses** | Monthly income, what you spent and what's left to save. Add expenses by category (create a new category straight from the form, or use **Categories** to rename or delete them) |
+| **Installments** | Set up a plan once (monthly amount, number of months, first payment month). Every month it appears in your expenses as e.g. *Installment 4/12* automatically, the amount still owed counts as debt, and it stops after the last payment |
+| **Debts** | Loans and card balances with monthly repayments. Repayments count as spending automatically |
+| **Wishlist** | A wishlist for each year with estimated cost. Tick items off as you get them |
+
+> **Spent** = expenses + installment payments + debt repayments. **Left to save** = income − spent.
 
 ## How to use
 
 1. **Computer:** double-click `fintrack.html` to open it in Chrome, Edge, Firefox or Safari. **Phone:** see the next section.
 2. Click **Start this month**, or **Try with demo data** to explore first.
-3. Each month, click **+ Month**. Keep “Copy all entries from the previous month” ticked, then update the numbers.
+3. Each month, click **+ Month**. Keep “Copy all entries from the previous month” ticked, then update the numbers. Installments move forward on their own.
 4. Use ← / → (or the arrows in the header) to move between months.
 
 ## Use it on iPhone or Android
