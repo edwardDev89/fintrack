@@ -254,6 +254,14 @@
   .row.done .row-value { color: var(--muted); }
   .cat-list .row { padding: 8px 2px; }
   .cat-list .row-actions { opacity: 1; }
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; margin: -6px 0 18px; border: 1px solid var(--border); border-radius: 14px; cursor: pointer; }
+  .switch-row b { display: block; font-weight: 600; }
+  .switch-row small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  input.switch { -webkit-appearance: none; appearance: none; flex: none; width: 44px; height: 26px; padding: 0; border-radius: 999px; border: 0; background: var(--border-strong); position: relative; cursor: pointer; transition: background-color .2s; }
+  input.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s; }
+  input.switch:checked { background: var(--pos); }
+  input.switch:checked::after { transform: translateX(18px); }
+  input.switch:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
   .link-row { cursor: pointer; border-radius: 10px; transition: background-color .15s; }
   .link-row:hover { background: var(--surface-2); }
   .link-row .icon-btn { color: var(--muted); }
@@ -512,7 +520,7 @@ const monthDiff = (a, b) => { const [ay, am] = a.split('-').map(Number), [by, bm
 function defaultState() {
   return {
     version: 2,
-    settings: { currency: 'MYR', theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', hidden: [], name: '' },
+    settings: { currency: 'MYR', theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', hidden: [], name: '', daily: false },
     categories: DEFAULT_CATEGORIES.map((name) => ({ id: uid(), name })),
     portfolioGoal: 0,
     installments: [],
@@ -538,6 +546,7 @@ function normalize(d) {
   if (s.theme === 'dark' || s.theme === 'light') out.settings.theme = s.theme;
   out.settings.hidden = Array.isArray(s.hidden) ? s.hidden.filter((x) => SERIES.some((sr) => sr.key === x)) : [];
   out.settings.name = str(s.name).trim().slice(0, 40);
+  out.settings.daily = s.daily === true;
   if (Array.isArray(d.categories)) out.categories = objs(d.categories).map((c) => ({ id: id(c.id), name: str(c.name, 'Unnamed') }));
   out.portfolioGoal = num(d.portfolioGoal);
   out.daily = objs(d.daily).filter((e) => DATE_RE.test(e.date))
@@ -642,7 +651,7 @@ function monthFlow(k) {
   const expenses = sum(m.expenses, 'amount');
   const instPay = activeInstallments(k).reduce((s, x) => s + x.p.monthly, 0);
   const payments = sum(m.debts, 'monthlyPayment');
-  const dailyList = dailyIn(k);
+  const dailyList = state.settings.daily ? dailyIn(k) : [];
   const daily = Math.round(sum(dailyList, 'amount') * 100) / 100;
   return { expenses, instPay, payments, daily, dailyCount: dailyList.length, spent: expenses + daily + instPay + payments, income: m.income };
 }
@@ -914,10 +923,8 @@ function renderSummary(keys) {
       <div class="stat-sub">${sub}</div>
     </div>`;
 
-  const bufferLine = t.available !== 0 || t.carried !== 0
-    ? `<span>Buffer <b class="${t.left < 0 ? 'neg' : ''}">${esc(money(t.left))}</b> leftover</span>` : '';
   const net = card('featured', 'Net worth', '--c1', esc(money(t.netWorth)),
-    `<span><b>${esc(money(t.portfolio))}</b> portfolio − <b>${esc(money(t.debt))}</b> debt</span>${bufferLine}${delta('netWorth', true)}`, money(t.netWorth));
+    `<span><b>${esc(money(t.portfolio))}</b> portfolio − <b>${esc(money(t.debt))}</b> debt</span>${delta('netWorth', true)}`, money(t.netWorth));
 
   let goalLine;
   if (state.portfolioGoal > 0) {
@@ -967,7 +974,9 @@ function renderDonuts() {
 }
 
 function renderTabs() {
-  $('#tabs').innerHTML = TABS.map(([k, l]) => `<button class="tab${ui.tab === k ? ' active' : ''}" role="tab" aria-selected="${ui.tab === k}" data-action="tab" data-tab="${k}">${l}</button>`).join('');
+  const tabs = TABS.filter(([k]) => k !== 'daily' || state.settings.daily);
+  if (!tabs.some(([k]) => k === ui.tab)) ui.tab = 'expenses';
+  $('#tabs').innerHTML = tabs.map(([k, l]) => `<button class="tab${ui.tab === k ? ' active' : ''}" role="tab" aria-selected="${ui.tab === k}" data-action="tab" data-tab="${k}">${l}</button>`).join('');
   $('#tabPanel').innerHTML = PANELS[ui.tab]();
   if (ui.focusDaily && $('#dailyLabel')) { $('#dailyLabel').focus({ preventScroll: true }); ui.focusDaily = false; }
 }
@@ -1102,8 +1111,13 @@ const PANELS = {
         </li>` });
     }
     rows.sort((a, b) => a.cat.localeCompare(b.cat) || b.amount - a.amount);
-    const extra = `<button class="btn btn-ghost" data-action="manage-categories">Categories</button>`;
-    const head = panelHead('Monthly expenses', `${rows.length} item${rows.length === 1 ? '' : 's'} · ${esc(money(t.expenses + t.daily + t.instPay))}`, 'expenses', 'Add expense', extra);
+    const extra = `<button class="btn btn-ghost" data-action="manage-categories">${I.plus}Categories</button>`;
+    const head = panelHead('Monthly expenses', '', 'expenses', 'Add expense', extra);
+    const dailyOn = state.settings.daily;
+    const toggle = `<label class="switch-row">
+        <span><b>Track daily expenses</b><small>${dailyOn ? 'On · log everyday spending in the Daily tab. It’s added here as Miscellaneous.' : 'Adds a Daily tab for small everyday spending (coffee, lunch, parking).'}</small></span>
+        <input type="checkbox" class="switch" id="dailyToggle" role="switch"${dailyOn ? ' checked' : ''} aria-label="Track daily expenses">
+      </label>`;
     const expenses = `<div class="section">
       ${rows.length ? `<ul class="list">${rows.map((x) => x.html).join('')}</ul>` : emptyList('No expenses for this month yet. Paying by installment? Choose <b>Installment</b> in <b>Add expense</b> and it will repeat every month for you.')}</div>`;
 
@@ -1114,7 +1128,7 @@ const PANELS = {
       ${debts.length ? `<ul class="list">${debts.map((d) => row('debts', d.id, d.name,
         `<span class="badge">${esc(d.type)}</span>${d.monthlyPayment > 0 ? `<span>${esc(money(d.monthlyPayment))}/mo${d.balance > 0 ? ` · ~${Math.ceil(d.balance / d.monthlyPayment)} months left` : ''}</span>` : ''}`,
         esc(money(d.balance)))).join('')}</ul>` : emptyList('No debts. Nice! Add loans or credit card balances here. Monthly repayments count as spending.')}</div>`;
-    return head + box + expenses + debtHtml;
+    return head + box + toggle + expenses + debtHtml;
   },
   daily() {
     const t = totals(ui.month);
@@ -1565,6 +1579,7 @@ function demoState() {
   s.settings.currency = state.settings.currency;
   s.settings.theme = state.settings.theme;
   s.settings.name = state.settings.name;
+  s.settings.daily = true;
   const cat = (n) => s.categories.find((c) => c.name === n).id;
   const r = Math.round;
   const N = 9, end = currentKey();
@@ -1738,7 +1753,14 @@ document.addEventListener('click', (e) => {
 
 $('#monthSelect').addEventListener('change', (e) => { ui.month = e.target.value; render(); });
 document.addEventListener('submit', (e) => { if (e.target.id === 'dailyForm') { e.preventDefault(); addDaily(e.target); } });
-document.addEventListener('change', (e) => { if (e.target.id === 'dailyDate') setDailyDate(e.target.value); });
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'dailyDate') setDailyDate(e.target.value);
+  if (e.target.id === 'dailyToggle') {
+    state.settings.daily = e.target.checked;
+    persist();
+    toast(e.target.checked ? 'Daily tab is on. Log everyday spending there.' : 'Daily tracking is off. Your entries are kept.');
+  }
+});
 $('#currencySelect').addEventListener('change', (e) => { state.settings.currency = e.target.value; fmtCache = {}; persist(); toast(`Currency set to ${e.target.value}`); });
 $('#importFile').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) importData(f); e.target.value = ''; });
 $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') closeModal(); });
