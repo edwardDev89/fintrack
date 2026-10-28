@@ -33,7 +33,8 @@
     --accent: #18181b; --accent-soft: rgba(24, 24, 27, .07);
     --grad-a: #18181b; --grad-b: #8e8e96;
     --pos: #0f9d6b; --neg: #e5484d; --warn: #e79d13;
-    --c1: #5b5bd6; --c2: #0ea5e9; --c3: #e5484d; --c4: #f5a524; --c5: #12a594;
+    --c1: #1e293b; --c2: #7487a0; --c3: #a9b6c7; --c4: #f5a524; --c5: #12a594;
+    --slate: #334155, #64748b, #94a3b8, #b8c4d3, #d3dbe5, #e8ecf1;
     --hero-bg: linear-gradient(140deg, #f1f1f3 0%, #fbfbfb 100%); --hero-border: #e2e2e6;
     --radius: 18px; --radius-sm: 10px;
     --shadow: 0 1px 2px rgba(17, 24, 39, .04);
@@ -47,7 +48,8 @@
     --accent: #e4e4e7; --accent-soft: rgba(228, 228, 231, .10);
     --grad-a: #fafafa; --grad-b: #7c7c85;
     --pos: #3dd68c; --neg: #ff6369; --warn: #fbbf24;
-    --c1: #8b8cf6; --c2: #38bdf8; --c3: #ff6369; --c4: #fbbf24; --c5: #2dd4bf;
+    --c1: #f1f5f9; --c2: #8b9bb1; --c3: #5b6b82; --c4: #fbbf24; --c5: #2dd4bf;
+    --slate: #e2e8f0, #b4c0d0, #8b9bb1, #677891, #4b5a70, #353f4f;
     --hero-bg: linear-gradient(140deg, #222328 0%, #141519 100%); --hero-border: #2e3037;
     --shadow: none; --shadow-lg: 0 24px 48px -12px rgba(0, 0, 0, .7);
     color-scheme: dark;
@@ -203,20 +205,20 @@
   .chart-hint { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
-  .donut { display: flex; align-items: center; gap: 24px; }
-  .donut svg { width: 164px; height: 164px; flex: none; }
-  @media (max-width: 480px) { .donut { flex-direction: column; align-items: stretch; } .donut svg { margin: 0 auto; } }
-  .donut .seg { transition: opacity .15s; cursor: default; }
-  .donut.hovering .seg:not(.on), .donut.hovering li:not(.on) { opacity: .3; }
-  .donut-total { fill: var(--text); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .donut-sub { fill: var(--muted); font-size: 11px; }
-  .legend-list { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; display: grid; gap: 2px; }
+  .breakdown .bd-total { font-size: 12px; color: var(--muted); }
+  .breakdown .bd-big { font-size: 24px; font-weight: 680; letter-spacing: -.03em; margin: 2px 0 14px; font-variant-numeric: tabular-nums; }
+  .bd-stack { display: flex; height: 12px; gap: 3px; margin-bottom: 14px; }
+  .bd-stack i { display: block; height: 100%; min-width: 4px; border-radius: 3px; transition: opacity .15s; }
+  .bd-stack i:first-child { border-top-left-radius: 99px; border-bottom-left-radius: 99px; }
+  .bd-stack i:last-child { border-top-right-radius: 99px; border-bottom-right-radius: 99px; }
+  .breakdown.hovering .bd-stack i:not(.on), .breakdown.hovering li:not(.on) { opacity: .3; }
+  .legend-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
   .legend-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 8px; font-size: 13px; transition: opacity .15s, background-color .15s; }
   .legend-list li:hover { background: var(--surface-2); }
   .legend-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
   .legend-list .pct { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   .legend-list .val { font-weight: 560; font-variant-numeric: tabular-nums; }
-  .empty-mini { display: grid; place-items: center; min-height: 164px; color: var(--muted); text-align: center; border: 1px dashed var(--border-strong); border-radius: 14px; padding: 16px; }
+  .empty-mini { display: grid; place-items: center; min-height: 140px; color: var(--muted); text-align: center; border: 1px dashed var(--border-strong); border-radius: 14px; padding: 16px; }
 
   /* Tabs & lists */
   .tabs { display: flex; gap: 2px; padding: 4px; background: var(--surface-2); border-radius: 999px; overflow-x: auto; scrollbar-width: none; width: max-content; max-width: 100%; margin-bottom: 22px; }
@@ -434,11 +436,11 @@
       </div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-head"><div><h2>Portfolio allocation</h2><p class="muted">By asset type</p></div></div>
+          <div class="card-head"><div><h2>Portfolio allocation</h2></div></div>
           <div id="assetDonut"></div>
         </div>
         <div class="card">
-          <div class="card-head"><div><h2>Expense breakdown</h2><p class="muted">By category</p></div></div>
+          <div class="card-head"><div><h2>Expense breakdown</h2></div></div>
           <div id="expenseDonut"></div>
         </div>
       </div>
@@ -485,7 +487,6 @@ const SERIES = [
   { key: 'portfolio', name: 'Portfolio', color: '--c2' },
   { key: 'debt', name: 'Debt', color: '--c3' }
 ];
-const PALETTE = ['#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#f43f5e', '#8b5cf6', '#22c55e', '#ec4899', '#64748b', '#eab308', '#06b6d4', '#a3a3a3'];
 const TABS = [['portfolio', 'Portfolio'], ['expenses', 'Monthly'], ['daily', 'Daily'], ['wishlist', 'Goals']];
 const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const GOAL_KINDS = { do: 'Year goal', buy: 'Spend goal' };
@@ -805,35 +806,31 @@ function lineChart(el, keys, series, selected, onHover) {
   });
 }
 
-function donut(el, items, centerLabel, emptyMsg) {
+// Minimal "stacked bar" breakdown: big total, one segmented bar, then a legend.
+// Shows the top 5 items and groups the rest as "Others"; shades come from the theme's --slate list.
+function breakdown(el, items, totalLabel, emptyMsg) {
   items = items.filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
   const total = items.reduce((s, x) => s + x.value, 0);
   if (!total) { el.innerHTML = `<div class="empty-mini">${esc(emptyMsg)}</div>`; return; }
-  const R = 64, SW = 18, C = 2 * Math.PI * R, gap = items.length > 1 ? 2 : 0;
-  let off = 0;
-  const segs = items.map((it, i) => {
-    it.color = PALETTE[i % PALETTE.length];
-    const len = (it.value / total) * C;
-    const seg = `<circle class="seg" data-i="${i}" cx="82" cy="82" r="${R}" fill="none" stroke="${it.color}" stroke-width="${SW}" stroke-dasharray="${Math.max(len - gap, 0.01)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 82 82)"/>`;
-    off += len;
-    return seg;
-  }).join('');
+  if (items.length > 6) {
+    const rest = items.slice(5).reduce((s, x) => s + x.value, 0);
+    items = items.slice(0, 5).concat({ label: `Others (${items.length - 5})`, value: rest });
+  }
+  const shades = cssVar('--slate').split(',').map((c) => c.trim());
+  items.forEach((it, i) => { it.color = shades[Math.min(i, shades.length - 1)]; });
   const pct = (v) => `${((v / total) * 100).toFixed(v / total < 0.1 ? 1 : 0)}%`;
-  el.innerHTML = `<div class="donut">
-    <svg viewBox="0 0 164 164" role="img" aria-label="${esc(centerLabel)} breakdown">
-      <circle cx="82" cy="82" r="${R}" fill="none" stroke="var(--surface-2)" stroke-width="${SW}"/>${segs}
-      <text class="donut-total" x="82" y="80" text-anchor="middle">${esc(money(total, true))}</text>
-      <text class="donut-sub" x="82" y="99" text-anchor="middle">${esc(centerLabel)}</text>
-    </svg>
+  el.innerHTML = `<div class="breakdown">
+    <div class="bd-total">${esc(totalLabel)}</div>
+    <div class="bd-big">${esc(money(total))}</div>
+    <div class="bd-stack" role="img" aria-label="${esc(totalLabel)} breakdown">${items.map((it, i) => `<i data-i="${i}" style="flex:${it.value};background:${it.color}" title="${esc(it.label)} · ${esc(money(it.value))}"></i>`).join('')}</div>
     <ul class="legend-list">${items.map((it, i) => `<li data-i="${i}"><i class="dot" style="background:${it.color}"></i><span class="name">${esc(it.label)}</span><span class="pct">${pct(it.value)}</span><span class="val">${esc(money(it.value, true))}</span></li>`).join('')}</ul>
   </div>`;
-  const wrap = $('.donut', el), tTot = $('.donut-total', el), tSub = $('.donut-sub', el);
+  const wrap = $('.breakdown', el), big = $('.bd-big', el), lbl = $('.bd-total', el);
   const setActive = (i) => {
     wrap.classList.toggle('hovering', i != null);
     $$('[data-i]', wrap).forEach((x) => x.classList.toggle('on', i != null && +x.dataset.i === i));
-    tTot.textContent = money(i == null ? total : items[i].value, true);
-    const label = i == null ? centerLabel : items[i].label;
-    tSub.textContent = label.length > 18 ? label.slice(0, 17) + '…' : label;
+    big.textContent = money(i == null ? total : items[i].value);
+    lbl.textContent = i == null ? totalLabel : `${items[i].label} · ${pct(items[i].value)}`;
   };
   $$('[data-i]', wrap).forEach((x) => {
     x.addEventListener('pointerenter', () => setActive(+x.dataset.i));
@@ -996,8 +993,8 @@ function renderDonuts() {
   if (t.daily > 0) add(MISC_LABEL, t.daily);
   if (t.payments > 0) add('Debt repayments', t.payments);
   const items = (o) => Object.entries(o).map(([label, value]) => ({ label, value }));
-  donut($('#assetDonut'), items(assets), 'Portfolio', 'Add assets in the Portfolio tab to see your allocation');
-  donut($('#expenseDonut'), items(spend), 'Spent', 'Add expenses in the Monthly or Daily tab to see the breakdown');
+  breakdown($('#assetDonut'), items(assets), 'Total portfolio', 'Add assets in the Portfolio tab to see your allocation');
+  breakdown($('#expenseDonut'), items(spend), 'Total spent', 'Add expenses in the Monthly or Daily tab to see the breakdown');
 }
 
 function renderTabs() {
