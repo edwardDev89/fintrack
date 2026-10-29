@@ -148,11 +148,31 @@
   .card-head h2 { font-size: 15px; font-weight: 620; letter-spacing: -.01em; }
   .card-head p { margin: 2px 0 0; font-size: 12.5px; }
 
-  /* Summary cards */
-  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  @media (max-width: 860px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stat.featured { grid-column: 1 / -1; } }
-  @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
-  .stat { display: flex; flex-direction: column; min-width: 0; }
+  /* Summary cards: a wrapping row; an opened card takes the full width and pushes the others down. */
+  .stats { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
+  .stats > .stat { flex: 1 1 0; }
+  .stats > .stat.open { flex-basis: 100%; }
+  @media (max-width: 860px) { .stats > .stat { flex-basis: calc(50% - 6px); } .stats > .stat.featured, .stats > .stat.open { flex-basis: 100%; } }
+  @media (max-width: 560px) { .stats > .stat { flex-basis: 100%; } }
+  .stat { display: flex; flex-direction: column; min-width: 0; transition: border-color .2s, box-shadow .2s; }
+  .stat.open { border-color: var(--border-strong); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .stat-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--border); min-height: 42px; }
+  .card-toggle { display: inline-flex; align-items: center; gap: 7px; border: 0; background: transparent; color: var(--text-2); font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 9px; margin-left: -9px; border-radius: 999px; cursor: pointer; transition: background-color .15s; }
+  .card-toggle:hover { background: var(--surface-2); }
+  .card-toggle svg.i { width: 15px; height: 15px; }
+  .card-toggle svg.chev { width: 14px; height: 14px; color: var(--muted); transition: transform .2s; }
+  .card-toggle[aria-expanded="true"] svg.chev { transform: rotate(180deg); }
+  .peek { display: flex; gap: 2px; height: 6px; width: 64px; flex: none; }
+  .peek i { border-radius: 2px; min-width: 3px; }
+  .peek-spark { width: 70px; height: 22px; flex: none; }
+  .locked { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .locked svg.i { width: 14px; height: 14px; }
+  .steps { display: flex; gap: 3px; flex: none; }
+  .steps i { width: 14px; height: 4px; border-radius: 2px; background: var(--border-strong); }
+  .steps i.on { background: var(--accent); }
+  .stat-body { margin-top: 6px; padding-top: 12px; animation: fade .2s ease-out; }
+  .trend-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  @media (min-width: 861px) { .stat.open .legend-list { grid-template-columns: 1fr 1fr; column-gap: 28px; } }
   .stat-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 520; }
   .stat-value { font-size: 27px; font-weight: 650; letter-spacing: -.03em; margin: 10px 0 8px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stat-value small { font-size: 14px; font-weight: 520; color: var(--muted); letter-spacing: 0; }
@@ -187,12 +207,6 @@
   .line-svg .sel-line { stroke: var(--muted); stroke-opacity: .45; stroke-dasharray: 3 3; }
   .line-svg .guide { stroke: var(--muted); stroke-dasharray: 3 3; }
   .line-svg .hover { transition: opacity .12s; pointer-events: none; }
-  .trend-card-head { align-items: flex-start; }
-  .trend-label { margin: 0; font-size: 12.5px; color: var(--muted); font-weight: 560; }
-  .trend-hero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 2px 0; }
-  .trend-hero b { font-size: 27px; font-weight: 680; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-  .trend-hero span { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .trend-hero span .muted { font-weight: 500; }
   .trend-sub { margin: 0; font-size: 12px; }
   .tooltip {
     position: absolute; top: 4px; pointer-events: none; z-index: 2; min-width: 180px; padding: 10px 12px; font-size: 12.5px;
@@ -203,8 +217,6 @@
   .tt-row span { display: flex; align-items: center; gap: 7px; color: var(--text-2); }
   .tt-row b { font-weight: 600; font-variant-numeric: tabular-nums; }
   .chart-hint { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
   .breakdown .bd-total { font-size: 12px; color: var(--muted); }
   .breakdown .bd-big { font-size: 24px; font-weight: 680; letter-spacing: -.03em; margin: 2px 0 14px; font-variant-numeric: tabular-nums; }
   .bd-stack { display: flex; height: 12px; gap: 3px; margin-bottom: 14px; }
@@ -423,27 +435,6 @@
     </div>
     <div class="stack">
       <div class="stats" id="summary"></div>
-      <div class="card">
-        <div class="card-head trend-card-head">
-          <div>
-            <p class="trend-label" id="trendLabel"></p>
-            <div class="trend-hero"><b id="trendValue"></b><span id="trendDelta"></span></div>
-            <p class="muted trend-sub" id="trendSub"></p>
-          </div>
-          <div class="chips" id="trendLegend"></div>
-        </div>
-        <div id="trendChart"></div>
-      </div>
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-head"><div><h2>Portfolio allocation</h2></div></div>
-          <div id="assetDonut"></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><div><h2>Expense breakdown</h2></div></div>
-          <div id="expenseDonut"></div>
-        </div>
-      </div>
       <div class="card editor" id="editor">
         <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
         <div id="tabPanel"></div>
@@ -492,6 +483,8 @@ const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const GOAL_KINDS = { do: 'Year goal', buy: 'Spend goal' };
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const NEW_OPTION = '__new__';
+const CARD_KEYS = ['net', 'port', 'debt'];
+const TREND_MIN_MONTHS = 3;
 const DAILY_LABEL = 'Daily expense';
 const MISC_LABEL = 'Miscellaneous';
 
@@ -511,6 +504,10 @@ const I = {
   sparkles: ico('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 17v4M17 19h4"/>'),
   reset: ico('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'),
   check: ico('<path d="M20 6 9 17l-5-5"/>'),
+  trend: ico('<path d="M4 17l5-6 4 3 7-8"/>'),
+  bars: ico('<path d="M4 6h16M4 12h10M4 18h5"/>'),
+  chev: '<svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
+  lock: ico('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
   user: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
   down: ico('<path d="M12 5v14M19 12l-7 7-7-7"/>'),
   x: ico('<path d="M18 6 6 18M6 6l12 12"/>')
@@ -534,7 +531,7 @@ const monthDiff = (a, b) => { const [ay, am] = a.split('-').map(Number), [by, bm
 function defaultState() {
   return {
     version: 2,
-    settings: { currency: 'MYR', theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', hidden: [], name: '', daily: false },
+    settings: { currency: 'MYR', theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', hidden: [], name: '', daily: false, open: [] },
     categories: DEFAULT_CATEGORIES.map((name) => ({ id: uid(), name })),
     portfolioGoal: 0,
     installments: [],
@@ -561,6 +558,7 @@ function normalize(d) {
   out.settings.hidden = Array.isArray(s.hidden) ? s.hidden.filter((x) => SERIES.some((sr) => sr.key === x)) : [];
   out.settings.name = str(s.name).trim().slice(0, 40);
   out.settings.daily = s.daily === true;
+  out.settings.open = Array.isArray(s.open) ? s.open.filter((x) => CARD_KEYS.includes(x)) : [];
   if (Array.isArray(d.categories)) out.categories = objs(d.categories).map((c) => ({ id: id(c.id), name: str(c.name, 'Unnamed') }));
   out.portfolioGoal = num(d.portfolioGoal);
   out.daily = objs(d.daily).filter((e) => DATE_RE.test(e.date))
@@ -806,22 +804,27 @@ function lineChart(el, keys, series, selected, onHover) {
   });
 }
 
-// Minimal "stacked bar" breakdown: big total, one segmented bar, then a legend.
-// Shows the top 5 items and groups the rest as "Others"; shades come from the theme's --slate list.
-function breakdown(el, items, totalLabel, emptyMsg) {
-  items = items.filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
-  const total = items.reduce((s, x) => s + x.value, 0);
-  if (!total) { el.innerHTML = `<div class="empty-mini">${esc(emptyMsg)}</div>`; return; }
+// Sorts items, keeps the top 5 and groups the rest as "Others", and assigns the theme's --slate shades.
+function topItems(items) {
+  items = items.filter((x) => x.value > 0).sort((a, b) => b.value - a.value).map((x) => ({ ...x }));
   if (items.length > 6) {
     const rest = items.slice(5).reduce((s, x) => s + x.value, 0);
     items = items.slice(0, 5).concat({ label: `Others (${items.length - 5})`, value: rest });
   }
   const shades = cssVar('--slate').split(',').map((c) => c.trim());
   items.forEach((it, i) => { it.color = shades[Math.min(i, shades.length - 1)]; });
+  return items;
+}
+
+// Minimal "stacked bar" breakdown: optional label + total, one segmented bar, then a legend.
+// With showTotal false (the card already shows the total), hovering just highlights the segment.
+function breakdown(el, items, totalLabel, emptyMsg, showTotal = true) {
+  items = topItems(items);
+  const total = items.reduce((s, x) => s + x.value, 0);
+  if (!total) { el.innerHTML = `<div class="empty-mini">${esc(emptyMsg)}</div>`; return; }
   const pct = (v) => `${((v / total) * 100).toFixed(v / total < 0.1 ? 1 : 0)}%`;
   el.innerHTML = `<div class="breakdown">
-    <div class="bd-total">${esc(totalLabel)}</div>
-    <div class="bd-big">${esc(money(total))}</div>
+    ${showTotal ? `<div class="bd-total">${esc(totalLabel)}</div><div class="bd-big">${esc(money(total))}</div>` : ''}
     <div class="bd-stack" role="img" aria-label="${esc(totalLabel)} breakdown">${items.map((it, i) => `<i data-i="${i}" style="flex:${it.value};background:${it.color}" title="${esc(it.label)} · ${esc(money(it.value))}"></i>`).join('')}</div>
     <ul class="legend-list">${items.map((it, i) => `<li data-i="${i}"><i class="dot" style="background:${it.color}"></i><span class="name">${esc(it.label)}</span><span class="pct">${pct(it.value)}</span><span class="val">${esc(money(it.value, true))}</span></li>`).join('')}</ul>
   </div>`;
@@ -829,6 +832,7 @@ function breakdown(el, items, totalLabel, emptyMsg) {
   const setActive = (i) => {
     wrap.classList.toggle('hovering', i != null);
     $$('[data-i]', wrap).forEach((x) => x.classList.toggle('on', i != null && +x.dataset.i === i));
+    if (!showTotal) return;
     big.textContent = money(i == null ? total : items[i].value);
     lbl.textContent = i == null ? totalLabel : `${items[i].label} · ${pct(items[i].value)}`;
   };
@@ -852,9 +856,7 @@ function render() {
   if (!has) return;
   renderMonthNav(keys);
   renderGreeting(keys);
-  renderSummary(keys);
-  renderTrend(keys);
-  renderDonuts();
+  renderCards(keys);
   renderTabs();
 }
 
@@ -907,11 +909,31 @@ function renderMonthNav(keys) {
   $('#pageTitle').textContent = monthLabel(ui.month, { month: 'long', year: 'numeric' });
 }
 
-function renderSummary(keys) {
+// Asset-type and spending-category totals for the month being viewed (used by the cards' charts and previews).
+function breakdownData() {
+  const m = cur(), t = totals(ui.month);
+  const assets = {}, spend = {};
+  m.assets.forEach((a) => { const k = a.type || 'Other'; assets[k] = (assets[k] || 0) + a.value; });
+  const add = (k, v) => { spend[k] = (spend[k] || 0) + v; };
+  m.expenses.forEach((e) => add(catName(e.categoryId), e.amount));
+  activeInstallments(ui.month).forEach(({ p }) => add(catName(p.categoryId), p.monthly));
+  if (t.daily > 0) add(MISC_LABEL, t.daily);
+  if (t.payments > 0) add('Debt repayments', t.payments);
+  const items = (o) => Object.entries(o).map(([label, value]) => ({ label, value })).filter((x) => x.value > 0);
+  return { assets: items(assets), spend: items(spend) };
+}
+
+// The three summary cards. Each has a footer toggle that expands its chart inside the card
+// (Net worth → trend, Portfolio → allocation, Debt → spending breakdown).
+function renderCards(keys) {
   const t = totals(ui.month);
   const i = keys.indexOf(ui.month);
   const p = i > 0 ? totals(keys[i - 1]) : null;
   const prevName = i > 0 ? monthLabel(keys[i - 1], { month: 'short' }) : '';
+  const data = breakdownData();
+  const canTrend = keys.length >= TREND_MIN_MONTHS;
+  const avail = { net: canTrend, port: data.assets.length > 0, debt: data.spend.length > 0 };
+  const isOpen = (k) => avail[k] && state.settings.open.includes(k);
   const delta = (k, upIsGood) => {
     if (!p) return '<span class="muted">First month tracked</span>';
     const d = t[k] - p[k];
@@ -921,15 +943,39 @@ function renderSummary(keys) {
     const pc = pct >= 0.1 ? ` · ${pct.toFixed(1)}%` : '';
     return `<span><span class="delta ${good ? 'pos' : 'neg'}">${d > 0 ? '↑' : '↓'} ${esc(money(Math.abs(d), true))}${pc}</span> <span class="muted">vs ${prevName}</span></span>`;
   };
-  const card = (cls, label, color, value, sub, title) => `
-    <div class="card stat ${cls}">
+  const strip = (items) => `<span class="peek" aria-hidden="true">${topItems(items).map((x) => `<i style="flex:${x.value};background:${x.color}"></i>`).join('')}</span>`;
+  const spark = () => {
+    const v = keys.map((k) => totals(k).netWorth), lo = Math.min(...v), hi = Math.max(...v), n = v.length;
+    const pts = v.map((x, j) => [2 + (j * 66) / (n - 1), 3 + (hi === lo ? 8 : ((hi - x) / (hi - lo)) * 16)]);
+    return `<svg class="peek-spark" viewBox="0 0 70 22" aria-hidden="true"><path d="${smoothPath(pts)}" fill="none" stroke="${cssVar('--c1')}" stroke-width="2" stroke-linecap="round"/></svg>`;
+  };
+  const toggle = (k, icon, showLabel, hideLabel, peek) => `
+    <div class="stat-foot">
+      <button class="card-toggle" data-action="toggle-card" data-key="${k}" aria-expanded="${isOpen(k)}">${icon}${isOpen(k) ? hideLabel : showLabel}${I.chev}</button>${peek}
+    </div>`;
+  const card = (k, cls, label, color, value, sub, foot, body, title) => `
+    <div class="card stat ${cls}${isOpen(k) ? ' open' : ''}">
       <div class="stat-label"><i class="dot" style="background:var(${color})"></i>${label}</div>
       <div class="stat-value" title="${esc(title || '')}">${value}</div>
       <div class="stat-sub">${sub}</div>
+      ${foot}
+      ${isOpen(k) ? `<div class="stat-body">${body}</div>` : ''}
     </div>`;
 
-  const net = card('featured', 'Net worth', '--c1', esc(money(t.netWorth)),
-    `<span><b>${esc(money(t.portfolio))}</b> portfolio − <b>${esc(money(t.debt))}</b> debt</span>${delta('netWorth', true)}`, money(t.netWorth));
+  let netFoot;
+  if (canTrend) netFoot = toggle('net', I.trend, 'Show trend', 'Hide trend', spark());
+  else {
+    const n = keys.length;
+    netFoot = `<div class="stat-foot"><span class="locked">${I.lock}Trend unlocks after ${TREND_MIN_MONTHS} months · ${n} of ${TREND_MIN_MONTHS}</span>
+      <span class="steps" aria-hidden="true">${Array.from({ length: TREND_MIN_MONTHS }, (_, j) => `<i class="${j < n ? 'on' : ''}"></i>`).join('')}</span></div>`;
+  }
+  const netBody = `<div class="trend-head">
+      <p class="muted trend-sub" id="trendSub"></p>
+      <div class="chips" id="trendLegend"></div>
+    </div><div id="trendChart"></div>`;
+  const net = card('net', 'featured', 'Net worth', '--c1', esc(money(t.netWorth)),
+    `<span><b>${esc(money(t.portfolio))}</b> portfolio − <b>${esc(money(t.debt))}</b> debt</span>${delta('netWorth', true)}`,
+    netFoot, netBody, money(t.netWorth));
 
   let goalLine;
   if (state.portfolioGoal > 0) {
@@ -939,13 +985,29 @@ function renderSummary(keys) {
   } else {
     goalLine = `<span><button class="link" data-action="edit-goal">Set a goal</button> for your total portfolio</span>`;
   }
-  const portfolio = card('', 'Portfolio', '--c2', esc(money(t.portfolio)), `${goalLine}${delta('portfolio', true)}`, money(t.portfolio));
+  const portFoot = avail.port ? toggle('port', I.bars, 'Show allocation', 'Hide allocation', strip(data.assets)) : '';
+  const portfolio = card('port', '', 'Portfolio', '--c2', esc(money(t.portfolio)), `${goalLine}${delta('portfolio', true)}`,
+    portFoot, '<div id="assetDonut"></div>', money(t.portfolio));
 
   const monthly = t.payments + t.instPay;
-  const debt = card('', 'Debt', '--c3', esc(money(t.debt)),
-    `<span><b>${esc(money(monthly))}</b>/mo repayments${t.instOwed > 0 ? ` · incl. ${esc(money(t.instOwed, true))} installments` : ''}</span>${delta('debt', false)}`, money(t.debt));
+  const debtFoot = avail.debt ? toggle('debt', I.bars, 'Spending breakdown', 'Hide spending', strip(data.spend)) : '';
+  const debt = card('debt', '', 'Debt', '--c3', esc(money(t.debt)),
+    `<span><b>${esc(money(monthly))}</b>/mo repayments${t.instOwed > 0 ? ` · incl. ${esc(money(t.instOwed, true))} installments` : ''}</span>${delta('debt', false)}`,
+    debtFoot, '<div id="expenseDonut"></div>', money(t.debt));
 
   $('#summary').innerHTML = net + portfolio + debt;
+  if (isOpen('net')) renderTrend(keys);
+  if (isOpen('port')) breakdown($('#assetDonut'), data.assets, 'Allocation by asset type', '', false);
+  if (isOpen('debt')) breakdown($('#expenseDonut'), data.spend, 'Spending this month by category', '');
+}
+
+function toggleCard(k) {
+  const o = state.settings.open;
+  state.settings.open = o.includes(k) ? o.filter((x) => x !== k) : o.concat(k);
+  save();
+  renderCards(monthKeys());
+  const btn = $(`[data-action="toggle-card"][data-key="${k}"]`);
+  if (btn) btn.focus({ preventScroll: true });
 }
 
 function bar(ratio, cls = '') {
@@ -953,48 +1015,13 @@ function bar(ratio, cls = '') {
 }
 
 function renderTrend(keys) {
+  if (!$('#trendChart')) return;
   keys = keys || monthKeys();
   const tots = keys.map(totals);
   const series = SERIES.map((s) => ({ ...s, color: cssVar(s.color), values: tots.map((t) => t[s.key]) }));
   $('#trendLegend').innerHTML = series.map((s) => `<button class="chip" data-action="toggle-series" data-key="${s.key}" aria-pressed="${!state.settings.hidden.includes(s.key)}"><i class="dot" style="background:${s.color}"></i>${s.name}</button>`).join('');
-  $('#trendSub').textContent = keys.length > 1
-    ? `${monthLabel(keys[0])} – ${monthLabel(keys[keys.length - 1])} · tap a month to open it`
-    : 'Add more months to see your trend';
-  const hero = series.find((s) => !state.settings.hidden.includes(s.key)) || series[0];
-  const si = Math.max(0, keys.indexOf(ui.month));
-  // The big number follows the hovered month and falls back to the month you're viewing.
-  const setHero = (i) => {
-    if (i == null) i = si;
-    const v = hero.values[i];
-    $('#trendLabel').textContent = `${hero.name} · ${monthLabel(keys[i], { month: 'short', year: 'numeric' })}`;
-    $('#trendValue').textContent = money(v);
-    const dEl = $('#trendDelta');
-    if (i === 0) { dEl.className = 'muted'; dEl.textContent = keys.length > 1 ? 'First month tracked' : ''; return; }
-    const prev = hero.values[i - 1], d = v - prev;
-    const prevName = monthLabel(keys[i - 1], { month: 'short' });
-    if (Math.abs(d) < 0.005) { dEl.className = 'muted'; dEl.textContent = `No change vs ${prevName}`; return; }
-    const good = d > 0 === (hero.key !== 'debt');
-    const pct = prev !== 0 ? Math.abs((d / prev) * 100) : 0;
-    dEl.className = good ? 'pos' : 'neg';
-    dEl.innerHTML = `${d > 0 ? '↑' : '↓'} ${esc(money(Math.abs(d)))}${pct >= 0.1 ? ` · ${pct.toFixed(1)}%` : ''} <span class="muted">vs ${esc(prevName)}</span>`;
-  };
-  setHero(null);
-  lineChart($('#trendChart'), keys, series, ui.month, setHero);
-}
-
-function renderDonuts() {
-  const m = cur(), t = totals(ui.month);
-  const assets = {};
-  m.assets.forEach((a) => { const k = a.type || 'Other'; assets[k] = (assets[k] || 0) + a.value; });
-  const spend = {};
-  const add = (k, v) => { spend[k] = (spend[k] || 0) + v; };
-  m.expenses.forEach((e) => add(catName(e.categoryId), e.amount));
-  activeInstallments(ui.month).forEach(({ p }) => add(catName(p.categoryId), p.monthly));
-  if (t.daily > 0) add(MISC_LABEL, t.daily);
-  if (t.payments > 0) add('Debt repayments', t.payments);
-  const items = (o) => Object.entries(o).map(([label, value]) => ({ label, value }));
-  breakdown($('#assetDonut'), items(assets), 'Total portfolio', 'Add assets in the Portfolio tab to see your allocation');
-  breakdown($('#expenseDonut'), items(spend), 'Total spent', 'Add expenses in the Monthly or Daily tab to see the breakdown');
+  $('#trendSub').textContent = `${monthLabel(keys[0])} – ${monthLabel(keys[keys.length - 1])} · tap a month to open it`;
+  lineChart($('#trendChart'), keys, series, ui.month);
 }
 
 function renderTabs() {
@@ -1756,6 +1783,7 @@ document.addEventListener('click', (e) => {
       ui.tab = b.dataset.tab; renderTabs();
       if (!b.closest('#tabs')) jumpToEditor();
       break;
+    case 'toggle-card': toggleCard(b.dataset.key); break;
     case 'toggle-series': {
       const h = state.settings.hidden, k = b.dataset.key;
       state.settings.hidden = h.includes(k) ? h.filter((x) => x !== k) : h.concat(k);
@@ -1802,16 +1830,17 @@ window.addEventListener('storage', (e) => {
   state = load(); fmtCache = {}; applyTheme(); render();
 });
 
-// Re-draw the trend chart when its width changes.
+// Re-draw the trend chart (if open) when the cards' width changes. The chart element itself is
+// re-created on every render, so watch the stable #summary container instead.
 let lastW = 0, rafId = 0;
 const onChartResize = () => {
-  const w = Math.round($('#trendChart').clientWidth);
+  const w = Math.round($('#summary').clientWidth);
   if (!w || w === lastW || !ui.month) return;
   lastW = w;
   cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(() => renderTrend());
 };
-if ('ResizeObserver' in window) new ResizeObserver(onChartResize).observe($('#trendChart'));
+if ('ResizeObserver' in window) new ResizeObserver(onChartResize).observe($('#summary'));
 else window.addEventListener('resize', onChartResize);
 
 /* ---------- Init ---------- */
