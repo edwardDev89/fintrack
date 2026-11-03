@@ -178,6 +178,8 @@
   .stat-value small { font-size: 14px; font-weight: 520; color: var(--muted); letter-spacing: 0; }
   .stat-sub { font-size: 12.5px; color: var(--muted); display: grid; gap: 6px; margin-top: auto; }
   .stat-sub b { color: var(--text-2); font-weight: 560; font-variant-numeric: tabular-nums; }
+  .warn-line { color: var(--warn); font-weight: 560; }
+  .warn-line .link { color: inherit; text-decoration-color: currentColor; }
   .stat.featured { background: var(--hero-bg); border-color: var(--hero-border); }
   .stat.featured .stat-label { color: var(--text-2); }
   .delta { font-weight: 560; font-variant-numeric: tabular-nums; }
@@ -989,10 +991,27 @@ function renderCards(keys) {
   const portfolio = card('port', '', 'Portfolio', '--c2', esc(money(t.portfolio)), `${goalLine}${delta('portfolio', true)}`,
     portFoot, '<div id="assetDonut"></div>', money(t.portfolio));
 
-  const monthly = t.payments + t.instPay;
   const debtFoot = avail.debt ? toggle('debt', I.bars, 'Spending breakdown', 'Hide spending', strip(data.spend)) : '';
+  const loans = t.debt - t.instOwed;
+  const parts = [];
+  if (loans > 0 || !t.instOwed) parts.push(`Loans <b>${esc(money(loans))}</b>`);
+  if (t.instOwed > 0) parts.push(`Installments <b>${esc(money(t.instOwed))}</b>`);
+  let debtLine;
+  if (!p) debtLine = '<span class="muted">First month tracked</span>';
+  else {
+    const paid = p.debt - t.debt;
+    const finished = activeInstallments(ui.month).filter(({ p: plan, s }) => s.n === plan.months).length;
+    const fin = finished ? ` · ${finished} installment${finished === 1 ? '' : 's'} finished 🎉` : '';
+    if (paid >= 0.005) debtLine = `<span><span class="delta pos">✓ ${esc(money(paid))} paid off</span> <span class="muted">since ${prevName}${fin}</span></span>`;
+    else if (paid <= -0.005) debtLine = `<span><span class="delta neg">${esc(money(-paid))} more debt</span> <span class="muted">since ${prevName}${fin}</span></span>`;
+    else debtLine = `<span class="muted">No change since ${prevName}${fin}</span>`;
+  }
+  // Remind when loans with a repayment still show last month's exact balance (likely not updated yet).
+  const prevDebts = p ? state.months[keys[i - 1]].debts : [];
+  const stale = cur().debts.some((d) => d.monthlyPayment > 0 && d.balance > 0 && prevDebts.some((x) => x.id === d.id && x.balance === d.balance));
+  const staleLine = stale ? `<span class="warn-line">⚠ Loan balances same as ${prevName} · <button class="link" data-action="update-loans">Update</button></span>` : '';
   const debt = card('debt', '', 'Debt', '--c3', esc(money(t.debt)),
-    `<span><b>${esc(money(monthly))}</b>/mo repayments${t.instOwed > 0 ? ` · incl. ${esc(money(t.instOwed, true))} installments` : ''}</span>${delta('debt', false)}`,
+    `<span>${parts.join(' · ')}</span>${debtLine}${staleLine}`,
     debtFoot, '<div id="expenseDonut"></div>', money(t.debt));
 
   $('#summary').innerHTML = net + portfolio + debt;
@@ -1072,7 +1091,7 @@ function addDaily(form) {
   let msg = `${label || DAILY_LABEL} · ${money(amount)} added${date === todayKey() ? '' : ` to ${dayLabel(date).toLowerCase() === 'yesterday' ? 'yesterday' : fmtDay(date)}`}`;
   if (!state.months[k]) {
     const prev = monthKeys().filter((x) => x < k).pop();
-    state.months[k] = prev ? copyMonth(state.months[prev]) : emptyMonth();
+    state.months[k] = prev ? copyMonth(state.months[prev], prev, k) : emptyMonth();
     msg = `Started ${monthLabel(k, { month: 'long', year: 'numeric' })}${prev ? ` (copied from ${monthLabel(prev, { month: 'short' })})` : ''} · ${msg}`;
   }
   if (ui.month !== k) ui.month = k;
@@ -1175,7 +1194,7 @@ const PANELS = {
     const debts = m.debts.slice().sort((a, b) => b.balance - a.balance);
     const debtSub = `${esc(money(t.debt - t.instOwed))} outstanding · ${esc(money(t.payments))}/mo` +
       (t.instOwed > 0 ? ` · plus ${esc(money(t.instOwed))} left on installments` : '');
-    const debtHtml = `<div class="section">${panelHead('Debts', debtSub, 'debts', 'Add debt')}
+    const debtHtml = `<div class="section" id="debtsSection">${panelHead('Debts', debtSub, 'debts', 'Add debt')}
       ${debts.length ? `<ul class="list">${debts.map((d) => row('debts', d.id, d.name,
         `<span class="badge">${esc(d.type)}</span>${d.monthlyPayment > 0 ? `<span>${esc(money(d.monthlyPayment))}/mo${d.balance > 0 ? ` · ~${Math.ceil(d.balance / d.monthlyPayment)} months left` : ''}</span>` : ''}`,
         esc(money(d.balance)))).join('')}</ul>` : emptyList('No debts. Nice! Add loans or credit card balances here. Monthly repayments count as spending.')}</div>`;
@@ -1586,7 +1605,15 @@ function toggleWish(id) {
 /* ---------- Months ---------- */
 const emptyMonth = () => ({ income: 0, assets: [], expenses: [], debts: [], carry: null });
 // A new month starts as a copy of an earlier one, but its carry-over is always automatic.
-const copyMonth = (src) => Object.assign(clone(src), { carry: null });
+// When copying forward, each loan's balance drops by its monthly repayment for every month moved
+// (an estimate: interest is ignored, so you can still correct it from your statement).
+function copyMonth(src, from, to) {
+  const m = Object.assign(clone(src), { carry: null });
+  const steps = from && to ? Math.max(0, monthDiff(from, to)) : 0;
+  if (steps) m.debts.forEach((d) => { d.balance = Math.max(0, Math.round((d.balance - d.monthlyPayment * steps) * 100) / 100); });
+  return m;
+}
+const loansReduced = (m) => m.debts.some((d) => d.monthlyPayment > 0);
 
 function addMonth() {
   const keys = monthKeys();
@@ -1603,9 +1630,11 @@ function addMonth() {
       if (!MONTH_RE.test(v.month)) return 'Please enter a month as YYYY-MM.';
       if (state.months[v.month]) return 'That month already exists.';
       const source = keys.filter((k) => k < v.month).pop() || keys[0];
-      state.months[v.month] = v.copy && source ? copyMonth(state.months[source]) : emptyMonth();
+      const copied = v.copy && source;
+      state.months[v.month] = copied ? copyMonth(state.months[source], source, v.month) : emptyMonth();
       ui.month = v.month;
-      toast(`${monthLabel(v.month, { month: 'long', year: 'numeric' })} created`);
+      const reduced = copied && source < v.month && loansReduced(state.months[v.month]);
+      toast(`${monthLabel(v.month, { month: 'long', year: 'numeric' })} created${reduced ? ' · loan balances reduced by repayments' : ''}`);
     }
   });
 }
@@ -1784,6 +1813,15 @@ document.addEventListener('click', (e) => {
       if (!b.closest('#tabs')) jumpToEditor();
       break;
     case 'toggle-card': toggleCard(b.dataset.key); break;
+    case 'update-loans': {
+      ui.tab = 'expenses'; renderTabs();
+      const sec = $('#debtsSection');
+      if (sec) {
+        sec.style.scrollMarginTop = getComputedStyle($('#editor')).scrollMarginTop;
+        sec.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      }
+      break;
+    }
     case 'toggle-series': {
       const h = state.settings.hidden, k = b.dataset.key;
       state.settings.hidden = h.includes(k) ? h.filter((x) => x !== k) : h.concat(k);
