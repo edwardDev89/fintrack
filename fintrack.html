@@ -32,6 +32,7 @@
     --text: #0e1116; --text-2: #3d4350; --muted: #7a8191;
     --accent: #18181b; --accent-soft: rgba(24, 24, 27, .07);
     --grad-a: #18181b; --grad-b: #8e8e96;
+    --mark-bg: #fde68a; --mark-fg: #0e1116;
     --pos: #0f9d6b; --neg: #e5484d; --warn: #e79d13;
     --c1: #1e293b; --c2: #7487a0; --c3: #a9b6c7; --c4: #f5a524; --c5: #12a594;
     --slate: #334155, #64748b, #94a3b8, #b8c4d3, #d3dbe5, #e8ecf1;
@@ -47,6 +48,7 @@
     --text: #eceef2; --text-2: #b8bdc8; --muted: #7d8494;
     --accent: #e4e4e7; --accent-soft: rgba(228, 228, 231, .10);
     --grad-a: #fafafa; --grad-b: #7c7c85;
+    --mark-bg: #854d0e; --mark-fg: #fef3c7;
     --pos: #3dd68c; --neg: #ff6369; --warn: #fbbf24;
     --c1: #f1f5f9; --c2: #8b9bb1; --c3: #5b6b82; --c4: #fbbf24; --c5: #2dd4bf;
     --slate: #e2e8f0, #b4c0d0, #8b9bb1, #677891, #4b5a70, #353f4f;
@@ -305,6 +307,26 @@
   .day-group + .day-group { margin-top: 16px; }
   .day-head { display: flex; justify-content: space-between; gap: 12px; padding: 6px 4px; font-size: 12.5px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
   .day-group .row:first-child { border-top: 0; }
+  .badge.acc { background: var(--accent-soft); color: var(--accent); }
+  .row-kicker { font-size: 10.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 1px; }
+  mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 3px; padding: 0 1px; }
+  .search-box { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 4px 0 13px; margin: 2px 0 10px; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--muted); background: var(--surface); transition: border-color .15s, box-shadow .15s; }
+  .search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search-box svg.i { width: 16px; height: 16px; }
+  .search-box input { flex: 1; min-width: 0; height: 36px; padding: 0; border: 0; background: transparent; box-shadow: none !important; }
+  .search-box .search-clear { visibility: hidden; }
+  .search-box.on .search-clear { visibility: visible; }
+  .list-meta { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 2px 4px 6px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .xgroup, .xgroup-single { border-top: 1px solid var(--border); }
+  .xgroup-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 4px; border: 0; border-radius: 10px; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background-color .15s; }
+  button.xgroup-head:hover { background: var(--surface-2); }
+  .xgroup-head svg.chev { width: 14px; height: 14px; color: var(--muted); flex: none; transition: transform .2s; }
+  .xgroup.closed .xgroup-head svg.chev { transform: rotate(-90deg); }
+  .xg-name { flex: 1; font-weight: 640; }
+  .xg-cnt { font-size: 12px; color: var(--muted); }
+  .xg-tot { min-width: 80px; text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .xgroup-items { padding-left: 24px; margin-bottom: 6px; }
+  @media (max-width: 560px) { .xgroup-items { padding-left: 14px; } }
 
   /* Empty / hero */
   .hero { min-height: calc(100vh - 170px); display: grid; place-items: center; text-align: center; padding: 48px 0; }
@@ -507,6 +529,7 @@ const I = {
   reset: ico('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'),
   check: ico('<path d="M20 6 9 17l-5-5"/>'),
   trend: ico('<path d="M4 17l5-6 4 3 7-8"/>'),
+  search: ico('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
   bars: ico('<path d="M4 6h16M4 12h10M4 18h5"/>'),
   chev: '<svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
   lock: ico('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
@@ -533,7 +556,7 @@ const monthDiff = (a, b) => { const [ay, am] = a.split('-').map(Number), [by, bm
 function defaultState() {
   return {
     version: 2,
-    settings: { currency: 'MYR', theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', hidden: [], name: '', daily: false, open: [] },
+    settings: { currency: 'MYR', theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', hidden: [], name: '', daily: false, open: [], collapsed: [] },
     categories: DEFAULT_CATEGORIES.map((name) => ({ id: uid(), name })),
     portfolioGoal: 0,
     installments: [],
@@ -561,6 +584,7 @@ function normalize(d) {
   out.settings.name = str(s.name).trim().slice(0, 40);
   out.settings.daily = s.daily === true;
   out.settings.open = Array.isArray(s.open) ? s.open.filter((x) => CARD_KEYS.includes(x)) : [];
+  out.settings.collapsed = Array.isArray(s.collapsed) ? s.collapsed.filter((x) => ['once', 'inst', 'daily'].includes(x)) : [];
   if (Array.isArray(d.categories)) out.categories = objs(d.categories).map((c) => ({ id: id(c.id), name: str(c.name, 'Unnamed') }));
   out.portfolioGoal = num(d.portfolioGoal);
   out.daily = objs(d.daily).filter((e) => DATE_RE.test(e.date))
@@ -1112,10 +1136,99 @@ const actions = (list, id) => `
   </div>`;
 const row = (list, id, title, sub, value, opts = {}) => `
   <li class="row${opts.cls ? ' ' + opts.cls : ''}">${opts.lead || ''}
-    <div class="row-main"><div class="row-title">${esc(title)}</div>${sub ? `<div class="row-sub">${sub}</div>` : ''}</div>
+    <div class="row-main">${opts.kicker ? `<div class="row-kicker">${opts.kicker}</div>` : ''}<div class="row-title">${opts.titleHtml != null ? opts.titleHtml : esc(title)}</div>${sub ? `<div class="row-sub">${sub}</div>` : ''}</div>
     <div class="row-value">${value}</div>${actions(list, id)}
   </li>`;
 const emptyList = (msg) => `<div class="empty-list">${msg}</div>`;
+
+// Escapes text and wraps the first case-insensitive match of q in <mark>.
+function hl(s, q) {
+  s = String(s == null ? '' : s);
+  const i = q ? s.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  return i < 0 ? esc(s) : `${esc(s.slice(0, i))}<mark>${esc(s.slice(i, i + q.length))}</mark>${esc(s.slice(i + q.length))}`;
+}
+const searchBox = (target, q, placeholder) => `
+  <div class="search-box${q ? ' on' : ''}">${I.search}
+    <input type="text" id="${target}Search" value="${esc(q || '')}" placeholder="${placeholder}" autocomplete="off" enterkeyhint="search" aria-label="${placeholder}">
+    <button type="button" class="icon-btn sm search-clear" data-action="clear-search" data-target="${target}" aria-label="Clear search">${I.x}</button>
+  </div>`;
+
+// Monthly expense list items, grouped by type: [key, label, items].
+function expenseGroups() {
+  const m = cur(), t = totals(ui.month);
+  const once = m.expenses.map((e) => ({ list: 'expenses', id: e.id, title: e.label || catName(e.categoryId), cat: catName(e.categoryId), amount: e.amount }));
+  const inst = activeInstallments(ui.month).map(({ p, s }) => ({ list: 'installments', id: p.id, title: p.name, cat: catName(p.categoryId), amount: p.monthly, p, s }));
+  const daily = t.dailyCount ? [{ daily: true, title: MISC_LABEL, cat: 'Daily spending', amount: t.daily, count: t.dailyCount }] : [];
+  return [['once', 'One-time', once], ['inst', 'Installments', inst], ['daily', 'Daily', daily]];
+}
+const GROUP_KICKER = { once: 'One-time', inst: 'Installment', daily: 'Daily' };
+
+function expenseRow(x, q, kicker) {
+  if (x.daily) {
+    return `<li class="row link-row" data-action="tab" data-tab="daily" title="Open daily expenses">
+      <div class="row-main">${kicker ? `<div class="row-kicker">${kicker}</div>` : ''}<div class="row-title">${hl(x.title, q)}</div>
+        <div class="row-sub"><span class="badge acc">${hl(x.cat, q)}</span><span>${x.count} entr${x.count === 1 ? 'y' : 'ies'} · tap to view</span></div></div>
+      <div class="row-value">${esc(money(x.amount))}</div>
+      <span class="icon-btn sm" aria-hidden="true">${I.right}</span>
+    </li>`;
+  }
+  let sub = `<span class="badge">${hl(x.cat, q)}</span>`;
+  if (x.s) {
+    sub += `<span class="badge acc">${x.s.n}/${x.p.months}</span>` +
+      (x.s.n === x.p.months ? '<span class="pos">Final payment 🎉</span>' : `<span>${esc(money(x.s.owed))} left · ends ${esc(monthLabel(x.s.end))}</span>`);
+  }
+  return row(x.list, x.id, '', sub, esc(money(x.amount)), { titleHtml: hl(x.title, q), kicker });
+}
+
+// Grouped (One-time · Installments · Daily), biggest first inside each group. A group with one
+// item is shown as a single row with a small type label; groups can be collapsed unless searching.
+function expenseListHtml() {
+  const q = (ui.expQ || '').trim();
+  const groups = expenseGroups();
+  const total = groups.reduce((n, g) => n + g[2].length, 0);
+  if (!total) return emptyList('No expenses for this month yet. Paying by installment? Choose <b>Installment</b> in <b>Add expense</b> and it will repeat every month for you.');
+  const match = (x) => !q || `${x.title} ${x.cat}`.toLowerCase().includes(q.toLowerCase());
+  const shown = groups.map(([k, label, items]) => [k, label, items.filter(match).sort((a, b) => b.amount - a.amount)]).filter((g) => g[2].length);
+  const n = shown.reduce((c, g) => c + g[2].length, 0);
+  const amt = shown.reduce((c, g) => c + sum(g[2], 'amount'), 0);
+  const multi = shown.filter((g) => g[2].length > 1).map((g) => g[0]);
+  const collapsed = state.settings.collapsed;
+  const allClosed = multi.length > 0 && multi.every((k) => collapsed.includes(k));
+  const meta = q
+    ? `<span>${n} of ${total} match · ${esc(money(amt))}</span><button class="link" data-action="clear-search" data-target="exp">Clear</button>`
+    : `<span>${total} item${total === 1 ? '' : 's'} · ${esc(money(amt))}</span>${multi.length ? `<button class="link" data-action="collapse-groups" data-mode="${allClosed ? 'expand' : 'collapse'}">${allClosed ? 'Expand all' : 'Collapse all'}</button>` : ''}`;
+  if (!n) return `<div class="list-meta">${meta}</div>${emptyList(`No expenses match “${esc(q)}”.`)}`;
+  return `<div class="list-meta">${meta}</div>` + shown.map(([k, label, items]) => {
+    if (items.length === 1) return `<ul class="list xgroup-single">${expenseRow(items[0], q, GROUP_KICKER[k])}</ul>`;
+    const closed = !q && collapsed.includes(k);
+    const inner = `${I.chev}<span class="xg-name">${label}</span><span class="xg-cnt">${items.length} items</span><span class="xg-tot">${esc(money(sum(items, 'amount')))}</span>`;
+    const headEl = q ? `<div class="xgroup-head">${inner}</div>`
+      : `<button type="button" class="xgroup-head" data-action="toggle-group" data-key="${k}" aria-expanded="${!closed}">${inner}</button>`;
+    return `<div class="xgroup${closed ? ' closed' : ''}">${headEl}${closed ? '' : `<ul class="list xgroup-items">${items.map((x) => expenseRow(x, q)).join('')}</ul>`}</div>`;
+  }).join('');
+}
+
+// Daily entries for the month, grouped by day (newest first), filtered by the daily search.
+function dailyListHtml() {
+  const q = (ui.dailyQ || '').trim();
+  const all = dailyIn(ui.month);
+  if (!all.length) return emptyList(`No daily spending logged for ${esc(monthLabel(ui.month, { month: 'long' }))} yet. Coffee, lunch, parking: add them above as they happen.`);
+  // Newest day first; within a day, most recently added first.
+  const entries = all.slice().reverse().sort((a, b) => b.date.localeCompare(a.date))
+    .filter((e) => !q || e.label.toLowerCase().includes(q.toLowerCase()));
+  const groups = [];
+  entries.forEach((e) => {
+    const g = groups[groups.length - 1];
+    if (g && g.date === e.date) g.items.push(e); else groups.push({ date: e.date, items: [e] });
+  });
+  const meta = q ? `<div class="list-meta"><span>${entries.length} match${entries.length === 1 ? '' : 'es'} · ${esc(money(sum(entries, 'amount')))} in ${esc(monthLabel(ui.month, { month: 'short' }))}</span><button class="link" data-action="clear-search" data-target="daily">Clear</button></div>` : '';
+  if (!entries.length) return meta + emptyList(`No daily expenses match “${esc(q)}”.`);
+  return meta + groups.map((g) => `
+    <div class="day-group">
+      <div class="day-head"><span>${esc(dayLabel(g.date))}</span><span>${esc(money(sum(g.items, 'amount')))}</span></div>
+      <ul class="list">${g.items.map((e) => row('daily', e.id, '', '', esc(money(e.amount)), { titleHtml: hl(e.label, q) })).join('')}</ul>
+    </div>`).join('');
+}
 
 const PANELS = {
   portfolio() {
@@ -1165,22 +1278,6 @@ const PANELS = {
       <div class="note">${usage} · ${carryNote}<br>Spent = ${parts.join(' + ')}</div>
     </div>`;
 
-    const rows = m.expenses.map((e) => ({ cat: catName(e.categoryId), amount: e.amount, html: row('expenses', e.id, e.label || catName(e.categoryId),
-      `<span class="badge">${esc(catName(e.categoryId))}</span>`, esc(money(e.amount))) }));
-    activeInstallments(ui.month).forEach(({ p, s }) => rows.push({ cat: catName(p.categoryId), amount: p.monthly, html: row('installments', p.id, p.name,
-      `<span class="badge">${esc(catName(p.categoryId))}</span><span class="badge" style="background:var(--accent-soft);color:var(--accent)">Installment ${s.n}/${p.months}</span>` +
-      `<span>${s.n === p.months ? 'Final payment' : `${esc(money(s.owed))} left · ends ${esc(monthLabel(s.end))}`}</span>`,
-      esc(money(p.monthly))) }));
-    if (t.dailyCount) {
-      rows.push({ cat: MISC_LABEL, amount: t.daily, html: `
-        <li class="row link-row" data-action="tab" data-tab="daily" title="Open daily expenses">
-          <div class="row-main"><div class="row-title">${MISC_LABEL}</div>
-            <div class="row-sub"><span class="badge" style="background:var(--accent-soft);color:var(--accent)">Daily spending</span><span>${t.dailyCount} entr${t.dailyCount === 1 ? 'y' : 'ies'} · tap to view</span></div></div>
-          <div class="row-value">${esc(money(t.daily))}</div>
-          <span class="icon-btn sm" aria-hidden="true">${I.right}</span>
-        </li>` });
-    }
-    rows.sort((a, b) => a.cat.localeCompare(b.cat) || b.amount - a.amount);
     const extra = `<button class="btn btn-ghost" data-action="manage-categories">${I.plus}Categories</button>`;
     const head = panelHead('Monthly expenses', '', 'expenses', 'Add expense', extra);
     const dailyOn = state.settings.daily;
@@ -1188,8 +1285,8 @@ const PANELS = {
         <span><b>Track daily expenses</b><small>${dailyOn ? 'On · log everyday spending in the Daily tab. It’s added here as Miscellaneous.' : 'Adds a Daily tab for small everyday spending (coffee, lunch, parking).'}</small></span>
         <input type="checkbox" class="switch" id="dailyToggle" role="switch"${dailyOn ? ' checked' : ''} aria-label="Track daily expenses">
       </label>`;
-    const expenses = `<div class="section">
-      ${rows.length ? `<ul class="list">${rows.map((x) => x.html).join('')}</ul>` : emptyList('No expenses for this month yet. Paying by installment? Choose <b>Installment</b> in <b>Add expense</b> and it will repeat every month for you.')}</div>`;
+    const hasItems = expenseGroups().some((g) => g[2].length);
+    const expenses = `<div class="section">${hasItems ? searchBox('exp', ui.expQ, 'Search expenses') : ''}<div id="expList">${expenseListHtml()}</div></div>`;
 
     const debts = m.debts.slice().sort((a, b) => b.balance - a.balance);
     const debtSub = `${esc(money(t.debt - t.instOwed))} outstanding · ${esc(money(t.payments))}/mo` +
@@ -1204,16 +1301,9 @@ const PANELS = {
     const t = totals(ui.month);
     const today = todayKey();
     const isCurrent = ui.month === currentKey();
-    const dayName = dayLabel;
-
-    // Newest day first; within a day, most recently added first.
-    const entries = dailyIn(ui.month).slice().reverse().sort((a, b) => b.date.localeCompare(a.date));
-    const groups = [];
-    entries.forEach((e) => {
-      const g = groups[groups.length - 1];
-      if (g && g.date === e.date) g.items.push(e); else groups.push({ date: e.date, items: [e] });
-    });
-    const todayTotal = sum(dailyIn(ui.month).filter((e) => e.date === today), 'amount');
+    const entries = dailyIn(ui.month);
+    const daysLogged = new Set(entries.map((e) => e.date)).size;
+    const todayTotal = sum(entries.filter((e) => e.date === today), 'amount');
     const [y, mo] = ui.month.split('-').map(Number);
     const lastDay = isCurrent ? new Date().getDate() : new Date(y, mo, 0).getDate();
     // Average from the first day you logged something, so starting mid-month doesn't drag it down.
@@ -1221,7 +1311,7 @@ const PANELS = {
     const daysSoFar = Math.max(1, lastDay - firstDay + 1);
     const box = `<div class="summary-box">
       <div><div class="lbl">${isCurrent ? 'This month' : monthLabel(ui.month, { month: 'long' })}</div><strong>${esc(money(t.daily))}</strong></div>
-      <div><div class="lbl">${isCurrent ? 'Today' : 'Days logged'}</div><strong>${isCurrent ? esc(money(todayTotal)) : groups.length}</strong></div>
+      <div><div class="lbl">${isCurrent ? 'Today' : 'Days logged'}</div><strong>${isCurrent ? esc(money(todayTotal)) : daysLogged}</strong></div>
       <div><div class="lbl">Daily average</div><strong>${esc(money(Math.round((t.daily / daysSoFar) * 100) / 100))}</strong></div>
       <div class="note">Counts as <b>${MISC_LABEL}</b> in your Monthly expenses.</div>
     </div>`;
@@ -1237,13 +1327,8 @@ const PANELS = {
         <button type="submit" class="btn btn-primary">${I.plus}Add</button>
       </form>
       <p class="quick-note" id="dailyNote">${dailyNote(sel)}</p>`;
-    const list = groups.length ? groups.map((g) => `
-      <div class="day-group">
-        <div class="day-head"><span>${esc(dayName(g.date))}</span><span>${esc(money(sum(g.items, 'amount')))}</span></div>
-        <ul class="list">${g.items.map((e) => row('daily', e.id, e.label, '', esc(money(e.amount)))).join('')}</ul>
-      </div>`).join('')
-      : emptyList(`No daily spending logged for ${esc(monthLabel(ui.month, { month: 'long' }))} yet. Coffee, lunch, parking: add them above as they happen.`);
-    return panelHead('Daily expenses', '') + box + quick + list;
+    const search = entries.length ? searchBox('daily', ui.dailyQ, 'Search daily expenses') : '';
+    return panelHead('Daily expenses', '') + box + quick + search + `<div id="dailyList">${dailyListHtml()}</div>`;
   },
   wishlist() {
     const y = wishYear();
@@ -1813,6 +1898,19 @@ document.addEventListener('click', (e) => {
       if (!b.closest('#tabs')) jumpToEditor();
       break;
     case 'toggle-card': toggleCard(b.dataset.key); break;
+    case 'toggle-group': {
+      const k = b.dataset.key, c = state.settings.collapsed;
+      state.settings.collapsed = c.includes(k) ? c.filter((x) => x !== k) : c.concat(k);
+      save(); $('#expList').innerHTML = expenseListHtml();
+      const again = $(`[data-action="toggle-group"][data-key="${k}"]`);
+      if (again) again.focus({ preventScroll: true });
+      break;
+    }
+    case 'collapse-groups':
+      state.settings.collapsed = b.dataset.mode === 'collapse' ? ['once', 'inst', 'daily'] : [];
+      save(); $('#expList').innerHTML = expenseListHtml();
+      break;
+    case 'clear-search': setSearch(b.dataset.target, '', true); break;
     case 'update-loans': {
       ui.tab = 'expenses'; renderTabs();
       const sec = $('#debtsSection');
@@ -1842,6 +1940,27 @@ document.addEventListener('click', (e) => {
 
 $('#monthSelect').addEventListener('change', (e) => { ui.month = e.target.value; render(); });
 document.addEventListener('submit', (e) => { if (e.target.id === 'dailyForm') { e.preventDefault(); addDaily(e.target); } });
+
+// Live search: only the list re-renders, so the search box keeps focus while typing.
+function setSearch(target, value, focus) {
+  const input = $(`#${target}Search`);
+  if (target === 'exp') { ui.expQ = value; $('#expList').innerHTML = expenseListHtml(); }
+  else { ui.dailyQ = value; $('#dailyList').innerHTML = dailyListHtml(); }
+  if (!input) return;
+  if (input.value !== value) input.value = value;
+  input.closest('.search-box').classList.toggle('on', !!value.trim());
+  if (focus) input.focus();
+}
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'expSearch') setSearch('exp', e.target.value);
+  if (e.target.id === 'dailySearch') setSearch('daily', e.target.value);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && (e.target.id === 'expSearch' || e.target.id === 'dailySearch') && e.target.value) {
+    e.stopPropagation();
+    setSearch(e.target.id === 'expSearch' ? 'exp' : 'daily', '', true);
+  }
+}, true);
 document.addEventListener('change', (e) => {
   if (e.target.id === 'dailyDate') setDailyDate(e.target.value);
   if (e.target.id === 'dailyToggle') {
