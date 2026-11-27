@@ -154,21 +154,25 @@
   .tabbar { display: none; }
   @media (max-width: 960px) {
     .page-nav { display: none; }
+    /* Floating rounded bar: sits just above the iPhone home swipe bar, content scrolls behind it. */
     .tabbar:not([hidden]) {
-      display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-      padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
-      background: var(--surface); background: color-mix(in srgb, var(--surface) 88%, transparent);
-      backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px); border-top: 1px solid var(--border);
+      --tabbar-gap: max(12px, calc(env(safe-area-inset-bottom) - 12px));
+      display: flex; position: fixed; left: 0; right: 0; bottom: var(--tabbar-gap); z-index: 20;
+      width: min(calc(100% - 28px - env(safe-area-inset-left) - env(safe-area-inset-right)), 460px); margin: 0 auto;
+      padding: 5px 4px; border-radius: 26px; border: 1px solid var(--border);
+      background: var(--surface); background: color-mix(in srgb, var(--surface) 78%, transparent);
+      backdrop-filter: saturate(170%) blur(16px); -webkit-backdrop-filter: saturate(170%) blur(16px);
+      box-shadow: 0 10px 28px -10px rgba(0, 0, 0, .35);
     }
-    .tabbar a { flex: 1; display: grid; justify-items: center; gap: 3px; padding: 4px 0 2px; color: var(--muted); font-size: 11px; font-weight: 600; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: color .2s; }
-    .tabbar .ico { display: grid; place-items: center; height: 26px; }
-    .tabbar svg.i { width: 22px; height: 22px; stroke-width: 1.8; }
+    .tabbar a { flex: 1; display: grid; justify-items: center; gap: 1px; padding: 3px 0; color: var(--muted); font-size: 10px; font-weight: 600; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: color .2s, opacity .2s; }
+    .tabbar .ico { display: grid; place-items: center; height: 22px; }
+    .tabbar svg.i { width: 20px; height: 20px; stroke-width: 1.8; }
     /* Active page: brightness only. */
     .tabbar a:not([aria-current="page"]) { opacity: .7; }
     .tabbar a[aria-current="page"] { color: var(--text); }
     .tabbar a[aria-current="page"] svg.i { stroke-width: 2.2; }
-    body.has-tabbar { padding-bottom: calc(62px + env(safe-area-inset-bottom)); }
-    body.has-tabbar .toasts { bottom: calc(82px + env(safe-area-inset-bottom)); }
+    body.has-tabbar { padding-bottom: calc(max(12px, calc(env(safe-area-inset-bottom) - 12px)) + 64px); }
+    body.has-tabbar .toasts { bottom: calc(max(12px, calc(env(safe-area-inset-bottom) - 12px)) + 64px); }
   }
 
   /* Summary cards can be reordered: press and hold one until it lifts, then drag. */
