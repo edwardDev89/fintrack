@@ -20,6 +20,8 @@
     document.documentElement.setAttribute('data-theme', t);
     document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#0a0b0e' : '#f7f7f8');
   } catch (e) {}
+  // Mark the installed Home Screen app (iOS reports it via navigator.standalone).
+  if (navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)) document.documentElement.classList.add('standalone');
   // Install/offline support only works when served over http(s), not when opened as a local file.
   if (/^https?:$/.test(location.protocol)) {
     var l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.webmanifest'; document.head.appendChild(l);
@@ -81,7 +83,8 @@
   }
   /* Installed Home Screen app: the status bar overlays the page and iOS softens the strip just below it,
      so give the logo row a little extra room to stay crisp. */
-  @media (display-mode: standalone) { .topbar { padding-top: calc(env(safe-area-inset-top) + 8px); } }
+  @media (display-mode: standalone) { .topbar { padding-top: calc(env(safe-area-inset-top) + 18px); } }
+  .standalone .topbar { padding-top: calc(env(safe-area-inset-top) + 18px); }
   .topbar-inner { display: flex; align-items: center; gap: 10px; min-height: 64px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 15px; letter-spacing: -.01em; margin-right: 8px; }
   .topbar-inner > .grow { flex: 1; }
