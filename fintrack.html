@@ -73,13 +73,15 @@
   svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
   /* Top bar */
+  /* Solid (not see-through) so iOS doesn't blur page content showing through under the status bar. */
   .topbar {
     position: sticky; top: 0; z-index: 20; background: var(--bg);
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px);
     border-bottom: 1px solid var(--border);
     padding-top: env(safe-area-inset-top);
   }
+  /* Installed Home Screen app: the status bar overlays the page and iOS softens the strip just below it,
+     so give the logo row a little extra room to stay crisp. */
+  @media (display-mode: standalone) { .topbar { padding-top: calc(env(safe-area-inset-top) + 8px); } }
   .topbar-inner { display: flex; align-items: center; gap: 10px; min-height: 64px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 15px; letter-spacing: -.01em; margin-right: 8px; }
   .topbar-inner > .grow { flex: 1; }
